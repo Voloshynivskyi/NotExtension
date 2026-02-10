@@ -8,7 +8,7 @@ let enabledForThisSite = true;
 export function setBadgeEnabledForThisSite(enabled) {
   enabledForThisSite = Boolean(enabled);
 
-  // якщо вимкнули — прибрати назавжди (і DOM, і видимість)
+  // If disabled, remove permanently (DOM and visibility).
   if (!enabledForThisSite) {
     destroyBadge();
   }
@@ -68,7 +68,7 @@ export function destroyBadge() {
 }
 
 export function setBadgeVisible(hasNote) {
-  // ✅ якщо disabled — не показуємо НІКОЛИ
+  // If disabled, never show the badge.
   if (!enabledForThisSite) return;
 
   const el = ensureBadge();

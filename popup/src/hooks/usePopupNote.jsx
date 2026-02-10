@@ -28,7 +28,7 @@ export function usePopupNote({ autosaveEnabled = true } = {}) {
   const autosaveTimerRef = React.useRef(null);
   const statusResetTimerRef = React.useRef(null);
 
-  // тримаємо актуальний noteText, щоб не “витирать” новий текст після старого delete
+  // Keep the latest note text to avoid overwriting newer edits after a delete.
   const noteTextRef = React.useRef(noteText);
   React.useEffect(() => {
     noteTextRef.current = noteText;
@@ -49,7 +49,7 @@ export function usePopupNote({ autosaveEnabled = true } = {}) {
     }, 900);
   }
 
-  // ✅ якщо autosave вимкнули — прибити pending debounce
+  // If autosave is disabled, clear any pending debounce.
   React.useEffect(() => {
     if (autosaveEnabled) return;
     if (autosaveTimerRef.current) {
@@ -143,7 +143,7 @@ export function usePopupNote({ autosaveEnabled = true } = {}) {
               ? "Unsaved"
               : "Ready";
 
-  // AUTOSAVE (debounce)
+  // Autosave (debounce)
   React.useEffect(() => {
     if (!autosaveEnabled) return;
     if (!origin || isLoading || isBusy) return;
@@ -320,7 +320,7 @@ export function usePopupNote({ autosaveEnabled = true } = {}) {
     if (chrome?.runtime?.openOptionsPage) {
       chrome.runtime.openOptionsPage();
     } else {
-      chrome.tabs.create({ url: chrome.runtime.getURL("options.html") });
+      chrome.tabs.create({ url: chrome.runtime.getURL("popup/options.html") });
     }
   }
 

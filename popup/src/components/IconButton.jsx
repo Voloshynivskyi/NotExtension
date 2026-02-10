@@ -40,7 +40,6 @@ export function IconButton({
   disabled = false,
   children,
 
-  // optional
   active = false,
   tone = "neutral",
   size = 30,
@@ -97,7 +96,7 @@ export function IconButton({
         cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.45 : 1,
         padding: 0,
-        color: resolvedIcon, // <- lucide іконки беруть currentColor
+        color: resolvedIcon, // <- lucide icons read currentColor
         transition:
           "background 120ms ease, border-color 120ms ease, transform 80ms ease",
         ...style,

@@ -14,7 +14,7 @@ const DEFAULT_SETTINGS = Object.freeze({
   },
 });
 
-// простий deepMerge для майбутніх вкладених секцій
+// Simple deepMerge for nested sections.
 function isPlainObject(v) {
   return v && typeof v === "object" && !Array.isArray(v);
 }
@@ -64,7 +64,7 @@ export function createSettingsHandlers() {
       const stored = res?.[SETTINGS_KEY];
       const settings = normalizeSettings(stored || DEFAULT_SETTINGS);
 
-      // якщо нічого не було — збережемо дефолти одразу
+      // If no settings exist yet, store defaults immediately.
       if (!stored) await storageSet({ [SETTINGS_KEY]: settings });
 
       return { ok: true, settings };
@@ -76,7 +76,7 @@ export function createSettingsHandlers() {
       const res = await storageGet([SETTINGS_KEY]);
       const current = normalizeSettings(res?.[SETTINGS_KEY] || DEFAULT_SETTINGS);
 
-      // patch може бути великим/вкладеним — deep merge
+      // Patch can be nested; use deep merge.
       const merged = deepMerge(current, patch);
       const next = normalizeSettings(merged);
 

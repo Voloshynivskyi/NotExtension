@@ -48,13 +48,13 @@ async function notifyActiveTabBadgeEnabled(origin, enabled) {
     const tab = tabs?.[0];
     if (!tab?.id) return;
 
-    // В content ми будемо перевіряти origin, щоб випадково не вплинути на іншу вкладку
+    // Content verifies origin to avoid affecting other tabs.
     chrome.tabs.sendMessage(tab.id, {
       type: "BADGE_ENABLED_SET",
       payload: { origin, enabled: Boolean(enabled) },
     });
   } catch {
-    // ігноруємо (наприклад, якщо немає permission або content не інжектнувся)
+    // Ignore (e.g., missing permissions or content script not injected).
   }
 }
 
@@ -62,7 +62,7 @@ export function useSettings() {
   const [settings, setSettings] = React.useState(DEFAULT);
   const [loaded, setLoaded] = React.useState(false);
 
-  // seq для "останній запит перемагає"
+  // Sequence so the latest request wins.
   const seqRef = React.useRef(0);
 
   React.useEffect(() => {
@@ -89,7 +89,7 @@ export function useSettings() {
     setSettings((prev) => {
       const prevSnap = prev;
 
-      // shallow merge + акуратно мерджимо badge, якщо він у patch
+      // Shallow merge and carefully merge badge if present in patch.
       const next = {
         ...prev,
         ...patchObj,
@@ -98,7 +98,7 @@ export function useSettings() {
           : (prev.badge ?? DEFAULT.badge),
       };
 
-      // нормалізуємо масив (на випадок сміття)
+      // Normalize the list in case of invalid input.
       next.badge.disabledOrigins = uniqStrings(next.badge.disabledOrigins);
 
       (async () => {
@@ -109,12 +109,12 @@ export function useSettings() {
           if (res?.ok && res.settings) {
             setSettings(res.settings);
           } else {
-            // rollback
+            // Roll back to the previous snapshot.
             setSettings(prevSnap);
           }
         } catch {
           if (seqRef.current !== seq) return;
-          // rollback
+          // Roll back to the previous snapshot.
           setSettings(prevSnap);
         }
       })();
@@ -151,7 +151,7 @@ export function useSettings() {
 
       const enabledNext = isBadgeEnabledForOriginFromSettings(next, origin);
 
-      // ✅ одразу оновлюємо content на активній вкладці
+      // Update the active tab content immediately.
       notifyActiveTabBadgeEnabled(origin, enabledNext);
 
       (async () => {
@@ -162,7 +162,7 @@ export function useSettings() {
           if (res?.ok && res.settings) {
             setSettings(res.settings);
           } else {
-            // rollback + revert content
+            // Roll back and revert content state.
             setSettings(prevSnap);
             const enabledPrev = isBadgeEnabledForOriginFromSettings(
               prevSnap,
@@ -172,7 +172,7 @@ export function useSettings() {
           }
         } catch {
           if (seqRef.current !== seq) return;
-          // rollback + revert content
+          // Roll back and revert content state.
           setSettings(prevSnap);
           const enabledPrev = isBadgeEnabledForOriginFromSettings(
             prevSnap,
@@ -192,7 +192,7 @@ export function useSettings() {
     autosaveEnabled: settings.autosaveEnabled,
     theme: settings.theme,
 
-    // badge section
+    // Badge section
     badgeGlobalEnabled: settings.badge?.globalEnabled ?? true,
     badgeDisabledOrigins: settings.badge?.disabledOrigins ?? [],
     isBadgeEnabledForOrigin,
@@ -214,7 +214,7 @@ export function useSettings() {
       patchOptimistic({ theme: next === "dark" ? "dark" : "light" });
     },
 
-    // глобальний master-toggle (для майбутньої сторінки Settings)
+    // Global master toggle (for the Settings page).
     setBadgeGlobalEnabled: (fnOrVal) => {
       const curr = settings.badge?.globalEnabled ?? true;
       const next = typeof fnOrVal === "function" ? fnOrVal(curr) : fnOrVal;
@@ -222,7 +222,7 @@ export function useSettings() {
       patchOptimistic({
         badge: {
           globalEnabled: Boolean(next),
-          // disabledOrigins залишаємо як є
+          // Keep disabledOrigins unchanged.
         },
       });
     },

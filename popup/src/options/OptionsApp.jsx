@@ -1,76 +1,57 @@
 import React from "react";
 import { useSettings } from "../hooks/useSettings";
 
+import { SettingsLayout } from "./components/SettingsLayout";
+
+import { GeneralPage } from "./pages/GeneralPage";
+import { BadgePage } from "./pages/BadgePage";
+import { HighlightsPage } from "./pages/HighlightsPage";
+import { PinsPage } from "./pages/PinsPage";
+import { ShortcutsPage } from "./pages/ShortcutsPage";
+import { DataPage } from "./pages/DataPage";
+import { AboutPage } from "./pages/AboutPage";
+
+import { useHashRoute } from "./utils/route";
+
+const NAV = [
+  { key: "general", label: "General" },
+  { key: "badge", label: "Badge & UI" },
+  { key: "highlights", label: "Highlights" },
+  { key: "pins", label: "Pins" },
+  { key: "shortcuts", label: "Shortcuts" },
+  { key: "data", label: "Data & Privacy" },
+  { key: "about", label: "About" },
+];
+
 export default function OptionsApp() {
   const settings = useSettings();
+  const route = useHashRoute({
+    defaultKey: "general",
+    allowedKeys: NAV.map((n) => n.key),
+  });
 
   React.useEffect(() => {
     document.documentElement.dataset.theme = settings.theme;
   }, [settings.theme]);
 
+  const common = { settings, routeKey: route.key };
+
   return (
-    <div
-      style={{
-        padding: 16,
-        fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Arial",
-      }}
+    <SettingsLayout
+      title="NotExtension"
+      subtitle="Settings"
+      nav={NAV}
+      activeKey={route.key}
+      onNavigate={route.setKey}
+      loading={!settings.loaded}
     >
-      <h2 style={{ margin: 0 }}>NotExtension — Settings</h2>
-
-      {!settings.loaded ? (
-        <div style={{ marginTop: 12 }}>Loading…</div>
-      ) : (
-        <div style={{ marginTop: 16, display: "grid", gap: 12, maxWidth: 520 }}>
-          <label
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              gap: 12,
-            }}
-          >
-            <span>Autosave</span>
-            <input
-              type="checkbox"
-              checked={settings.autosaveEnabled}
-              onChange={() => settings.setAutosaveEnabled((v) => !v)}
-            />
-          </label>
-
-          <label
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              gap: 12,
-            }}
-          >
-            <span>Theme</span>
-            <select
-              value={settings.theme}
-              onChange={(e) => settings.setTheme(e.target.value)}
-            >
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-            </select>
-          </label>
-
-          <label
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              gap: 12,
-            }}
-          >
-            <span>Badge (global)</span>
-            <input
-              type="checkbox"
-              checked={settings.badgeGlobalEnabled}
-              onChange={() => settings.setBadgeGlobalEnabled((v) => !v)}
-            />
-          </label>
-
-          {/* Пізніше: список disabledOrigins, пошук, кнопки Reset тощо */}
-        </div>
-      )}
-    </div>
+      {route.key === "general" && <GeneralPage {...common} />}
+      {route.key === "badge" && <BadgePage {...common} />}
+      {route.key === "highlights" && <HighlightsPage {...common} />}
+      {route.key === "pins" && <PinsPage {...common} />}
+      {route.key === "shortcuts" && <ShortcutsPage {...common} />}
+      {route.key === "data" && <DataPage {...common} />}
+      {route.key === "about" && <AboutPage {...common} />}
+    </SettingsLayout>
   );
 }

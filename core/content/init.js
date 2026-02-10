@@ -26,7 +26,7 @@ function isBadgeEnabledForOrigin(settings, origin) {
 export async function initBadgeFromBackground() {
   const origin = window.location.origin;
 
-  // 1) прочитали settings
+  // 1) Load settings.
   const sRes = await sendMessagePromise({
     type: MessageTypes.SETTINGS_GET,
     payload: {},
@@ -36,10 +36,10 @@ export async function initBadgeFromBackground() {
   const enabled = isBadgeEnabledForOrigin(settings, origin);
   setBadgeEnabledForThisSite(enabled);
 
-  // ✅ якщо вимкнено — бейдж НЕ створюємо і взагалі не питаємо про hasNote
+  // If disabled, do not create the badge or request note status.
   if (!enabled) return;
 
-  // 2) якщо enabled — тоді вже працюємо як раніше
+  // 2) If enabled, proceed with normal behavior.
   ensureBadge();
   setBadgeVisible(false);
 
@@ -49,7 +49,7 @@ export async function initBadgeFromBackground() {
   });
 
   if (bRes?.ok && typeof bRes.hasNote === "boolean") {
-    // ✅ показуємо ТІЛЬКИ якщо є нотатка
+    // Show only when a note exists.
     setBadgeVisible(bRes.hasNote);
   }
 }

@@ -44,17 +44,17 @@ function Spinner() {
   return <span className="neMiniSpinner" />;
 }
 
-// Saving: маленький “пульс/хвиля”, виглядає краще ніж велика іконка
+// Saving: a small pulse looks better than a large icon.
 function SavingPulse() {
   return <span className="neMiniPulse" />;
 }
 
-// Deleting: мінімальна анімація “кришки”
+// Deleting: minimal "lid" animation.
 function TrashLid() {
   return <span className="neMiniTrash" />;
 }
 
-// Deleted: маленька галочка
+// Deleted: small checkmark.
 function Check() {
   return <span className="neMiniCheck" />;
 }

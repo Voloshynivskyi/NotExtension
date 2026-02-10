@@ -32,14 +32,12 @@ export function TopBar({
   status,
   statusText,
 
-  // actions
   onSettings,
   onSave,
   onDelete,
   canSave,
   canDelete,
 
-  // settings (global)
   autosaveEnabled,
   badgeEnabled,
   theme,
@@ -66,7 +64,6 @@ export function TopBar({
         alignItems: "start",
       }}
     >
-      {/* LEFT */}
       <div style={{ minWidth: 0 }}>
         <div
           style={{
@@ -98,7 +95,6 @@ export function TopBar({
         </div>
       </div>
 
-      {/* RIGHT: 2x3 grid */}
       <div
         style={{
           display: "grid",
@@ -109,7 +105,6 @@ export function TopBar({
           marginTop: 2,
         }}
       >
-        {/* Row 1: Badge / Autosave / Theme */}
         <IconButton
           title={badgeEnabled ? "Badge: ON" : "Badge: OFF"}
           onClick={onToggleBadge}
@@ -147,7 +142,6 @@ export function TopBar({
           {isDark ? <Moon size={16} /> : <Sun size={16} />}
         </IconButton>
 
-        {/* Row 2: Save / Delete / Settings */}
         <IconButton
           title="Save"
           onClick={onSave}

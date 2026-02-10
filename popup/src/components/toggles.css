@@ -1,6 +1,5 @@
 /* popup/src/components/toggles/toggles.css */
 
-/* ---------- базові змінні ---------- */
 :root {
   --ne-border: rgba(0, 0, 0, 0.1);
   --ne-text: #121821;
@@ -11,7 +10,6 @@
   --ne-off: rgba(0, 0, 0, 0.22);
 }
 
-/* ---------- Toggle pill (Badge / Auto) ---------- */
 .neTgl {
   height: 22px;
   padding: 0 8px;
@@ -47,7 +45,6 @@
   color: var(--ne-muted);
 }
 
-/* маленький switch */
 .neSwitch {
   width: 30px;
   height: 16px;
@@ -78,7 +75,6 @@
   transform: translateX(14px);
 }
 
-/* ---------- Theme toggle (🌙/☀) ---------- */
 .neTheme {
   height: 22px;
   width: 44px;
@@ -137,7 +133,6 @@
   transform: translateX(18px);
 }
 
-/* маленький svg стиль */
 .neIcon16 {
   width: 14px;
   height: 14px;

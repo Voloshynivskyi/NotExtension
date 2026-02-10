@@ -38,7 +38,7 @@ async function handleMessage(message) {
 
   switch (type) {
     case ContentEventTypes.BADGE_SET: {
-      // ✅ якщо disabled — ігноруємо, не створюємо DOM, не показуємо
+      // If disabled, ignore and do not create or show the badge.
       if (!isBadgeEnabledForThisSite()) return;
       setBadgeVisible(Boolean(payload?.hasNote));
       break;
@@ -49,12 +49,10 @@ async function handleMessage(message) {
       setBadgeEnabledForThisSite(enabled);
 
       if (!enabled) {
-        // 
         setBadgeVisible(false);
         return;
       }
 
-      // 
       await refreshHasNote();
       break;
     }

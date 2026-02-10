@@ -1,4 +1,3 @@
-/* Мінімальний статус (НЕ таблетка на пів екрана) */
 .neMiniStatus {
   display: inline-flex;
   align-items: center;
@@ -10,15 +9,12 @@
   line-height: 1;
   user-select: none;
 
-  /* дуже легка підкладка + бордер, щоб читалось на білому */
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(0, 0, 0, 0.1);
 
-  /* щоб виглядало як “маленька штучка” */
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06);
 }
 
-/* якщо хочеш ще менше — закоментуй текст */
 .neMiniText {
   white-space: nowrap;
   max-width: 130px;
@@ -35,7 +31,6 @@
   justify-content: center;
 }
 
-/* Базовий кружечок */
 .neMiniDot {
   width: 8px;
   height: 8px;
@@ -44,32 +39,29 @@
   box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06);
 }
 
-/* Кольори станів (твоя логіка) */
 .neMiniStatus--ready {
   color: #16a34a;
-} /* зелений */
+}
 .neMiniStatus--unsaved {
   color: #f59e0b;
-} /* жовтий */
+}
 .neMiniStatus--error {
   color: #ef4444;
-} /* червоний */
+}
 .neMiniStatus--deleted {
   color: #2563eb;
-} /* синій */
+}
 
-/* Додаткові (я пропоную такі) */
 .neMiniStatus--loading {
   color: #6b7280;
-} /* сірий */
+}
 .neMiniStatus--saving {
   color: #7c3aed;
-} /* фіолетовий */
+}
 .neMiniStatus--deleting {
   color: #f97316;
-} /* помаранчевий */
+}
 
-/* Spinner */
 .neMiniSpinner {
   width: 12px;
   height: 12px;
@@ -85,7 +77,6 @@
   }
 }
 
-/* Saving pulse */
 .neMiniPulse {
   width: 10px;
   height: 10px;
@@ -110,7 +101,6 @@
   }
 }
 
-/* Deleting trash lid (мінімалістично) */
 .neMiniTrash {
   width: 10px;
   height: 8px;
@@ -143,7 +133,6 @@
   }
 }
 
-/* Deleted check */
 .neMiniCheck {
   width: 10px;
   height: 10px;
@@ -161,7 +150,6 @@
   transform: rotate(-45deg);
 }
 
-/* Reduce motion */
 @media (prefers-reduced-motion: reduce) {
   .neMiniSpinner,
   .neMiniPulse,
