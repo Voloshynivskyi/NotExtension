@@ -1,3 +1,4 @@
+/* C:\Users\ASUS ZenBook\Documents\Portfolio Projects\NotExtension\popup\src\App.css */
 #root {
   max-width: 1280px;
   margin: 0 auto;
@@ -39,4 +40,12 @@
 
 .read-the-docs {
   color: #888;
+}
+.noteTextarea::-webkit-resizer {
+  display: none;
+}
+
+.noteTextarea {
+  resize: vertical;
+  overflow: auto;
 }

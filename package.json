@@ -1,0 +1,12 @@
+{
+  "name": "notextension",
+  "private": true,
+  "scripts": {
+    "build:core": "node scripts/build-core.mjs",
+    "build:popup": "npm --prefix popup run build",
+    "build": "npm run build:core && npm run build:popup"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

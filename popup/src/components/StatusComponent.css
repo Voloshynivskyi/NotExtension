@@ -1,0 +1,171 @@
+/* Мінімальний статус (НЕ таблетка на пів екрана) */
+.neMiniStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1;
+  user-select: none;
+
+  /* дуже легка підкладка + бордер, щоб читалось на білому */
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+
+  /* щоб виглядало як “маленька штучка” */
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06);
+}
+
+/* якщо хочеш ще менше — закоментуй текст */
+.neMiniText {
+  white-space: nowrap;
+  max-width: 130px;
+  overflow: hidden;
+  margin-right: 2px;
+  text-overflow: ellipsis;
+}
+
+.neMiniIcon {
+  width: 12px;
+  height: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Базовий кружечок */
+.neMiniDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06);
+}
+
+/* Кольори станів (твоя логіка) */
+.neMiniStatus--ready {
+  color: #16a34a;
+} /* зелений */
+.neMiniStatus--unsaved {
+  color: #f59e0b;
+} /* жовтий */
+.neMiniStatus--error {
+  color: #ef4444;
+} /* червоний */
+.neMiniStatus--deleted {
+  color: #2563eb;
+} /* синій */
+
+/* Додаткові (я пропоную такі) */
+.neMiniStatus--loading {
+  color: #6b7280;
+} /* сірий */
+.neMiniStatus--saving {
+  color: #7c3aed;
+} /* фіолетовий */
+.neMiniStatus--deleting {
+  color: #f97316;
+} /* помаранчевий */
+
+/* Spinner */
+.neMiniSpinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  border: 2px solid rgba(0, 0, 0, 0.16);
+  border-top-color: currentColor;
+  animation: neSpin 0.9s linear infinite;
+}
+
+@keyframes neSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Saving pulse */
+.neMiniPulse {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.35;
+  animation: nePulse 0.8s ease-in-out infinite;
+}
+
+@keyframes nePulse {
+  0% {
+    transform: scale(0.75);
+    opacity: 0.25;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 0.95;
+  }
+  100% {
+    transform: scale(0.75);
+    opacity: 0.25;
+  }
+}
+
+/* Deleting trash lid (мінімалістично) */
+.neMiniTrash {
+  width: 10px;
+  height: 8px;
+  border-radius: 3px;
+  border: 2px solid currentColor;
+  position: relative;
+  animation: neTrash 0.9s ease-in-out infinite;
+}
+.neMiniTrash::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: 1px;
+  width: 6px;
+  height: 3px;
+  border-radius: 2px;
+  border: 2px solid currentColor;
+  background: transparent;
+}
+
+@keyframes neTrash {
+  0% {
+    transform: rotate(-10deg) translateY(-1px);
+  }
+  60% {
+    transform: rotate(0deg) translateY(0px);
+  }
+  100% {
+    transform: rotate(0deg) translateY(0px);
+  }
+}
+
+/* Deleted check */
+.neMiniCheck {
+  width: 10px;
+  height: 10px;
+  position: relative;
+}
+.neMiniCheck::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 6px;
+  height: 3px;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+}
+
+/* Reduce motion */
+@media (prefers-reduced-motion: reduce) {
+  .neMiniSpinner,
+  .neMiniPulse,
+  .neMiniTrash {
+    animation: none !important;
+  }
+}

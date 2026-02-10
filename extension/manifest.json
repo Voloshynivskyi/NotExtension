@@ -15,5 +15,10 @@
     }
   ],
   "permissions": ["storage", "tabs"],
-  "host_permissions": ["<all_urls>"]
+  "host_permissions": ["<all_urls>"],
+
+  "options_ui": {
+    "page": "popup/options.html",
+    "open_in_tab": true
+  }
 }

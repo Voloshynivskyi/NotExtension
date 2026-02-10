@@ -1,35 +1,43 @@
-// extension/content/content.js
-// Minimal, scalable content script for a "has note" badge.
-// Responsibility: UI only (render + update). No storage logic.
-
 (() => {
-  // ----- Protocol (message types) -----
-  const MessageTypes = Object.freeze({
-    BADGE_SET: "BADGE_SET", // payload: { hasNote: boolean }
-    BADGE_STATUS_GET: "BADGE_STATUS_GET", // payload: { origin: string }
+  // core/shared/protocol.js
+  var MessageTypes = Object.freeze({
+    NOTE_SET: "NOTE_SET",
+    NOTE_GET: "NOTE_GET",
+    NOTE_DELETE: "NOTE_DELETE",
+    BADGE_STATUS_GET: "BADGE_STATUS_GET",
+    SETTINGS_GET: "SETTINGS_GET",
+    SETTINGS_PATCH: "SETTINGS_PATCH"
+  });
+  var ContentEventTypes = Object.freeze({
+    BADGE_SET: "BADGE_SET",
+    BADGE_ENABLED_SET: "BADGE_ENABLED_SET"
   });
 
-  // ----- DOM IDs / constants -----
-  const BADGE_ID = "notextension-note-badge";
-  const Z_INDEX = 2147483647; // max-ish, keeps badge on top
-
-  // ----- Internal state -----
-  let badgeEl = null;
-
-  // ----- Create badge element once -----
+  // core/content/ui/badge.js
+  var BADGE_ID = "notextension-note-badge";
+  var Z_INDEX = 2147483647;
+  var badgeEl = null;
+  var enabledForThisSite = true;
+  function setBadgeEnabledForThisSite(enabled) {
+    enabledForThisSite = Boolean(enabled);
+    if (!enabledForThisSite) {
+      destroyBadge();
+    }
+  }
+  function isBadgeEnabledForThisSite() {
+    return enabledForThisSite;
+  }
   function ensureBadge() {
+    if (!enabledForThisSite) return null;
     if (badgeEl && document.contains(badgeEl)) return badgeEl;
-
     badgeEl = document.createElement("div");
     badgeEl.id = BADGE_ID;
-
-    // Minimal style (safe defaults). You can theme later.
     Object.assign(badgeEl.style, {
       position: "fixed",
       top: "12px",
       right: "12px",
       zIndex: String(Z_INDEX),
-      display: "none", // default hidden
+      display: "none",
       padding: "6px 10px",
       borderRadius: "999px",
       fontSize: "12px",
@@ -39,66 +47,120 @@
       color: "#fff",
       boxShadow: "0 6px 18px rgba(0,0,0,0.18)",
       userSelect: "none",
-      cursor: "default",
+      cursor: "default"
     });
-
-    badgeEl.textContent = "📝 Note";
-
-    // Attach after DOM is ready-ish
-    if (document.documentElement) {
-      document.documentElement.appendChild(badgeEl);
+    badgeEl.textContent = "\u{1F4DD} Note";
+    const mount = () => {
+      const parent = document.body || document.documentElement;
+      if (parent && badgeEl && !parent.contains(badgeEl)) parent.appendChild(badgeEl);
+    };
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", mount, { once: true });
     } else {
-      document.addEventListener("DOMContentLoaded", () => {
-        document.documentElement.appendChild(badgeEl);
-      });
+      mount();
     }
-
     return badgeEl;
   }
-
-  // ----- Show/hide badge (single responsibility) -----
+  function destroyBadge() {
+    if (badgeEl && badgeEl.parentNode) {
+      badgeEl.parentNode.removeChild(badgeEl);
+    }
+    badgeEl = null;
+  }
   function setBadgeVisible(hasNote) {
+    if (!enabledForThisSite) return;
     const el = ensureBadge();
-    el.style.display = hasNote ? "block" : "none";
-    // Optional: accessibility
-    el.setAttribute("aria-hidden", hasNote ? "false" : "true");
+    if (!el) return;
+    const visible = Boolean(hasNote);
+    el.style.display = visible ? "block" : "none";
+    el.setAttribute("aria-hidden", visible ? "false" : "true");
   }
 
-  // ----- Message handler (router-ready) -----
-  function handleMessage(message) {
+  // core/content/init.js
+  function sendMessagePromise(message) {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(message, (response) => {
+        const err = chrome.runtime.lastError;
+        if (err) return resolve(null);
+        resolve(response);
+      });
+    });
+  }
+  function isBadgeEnabledForOrigin(settings, origin) {
+    const badge = settings?.badge;
+    const globalEnabled = badge?.globalEnabled !== false;
+    const disabled = Array.isArray(badge?.disabledOrigins) ? badge.disabledOrigins : [];
+    return globalEnabled && !disabled.includes(origin);
+  }
+  async function initBadgeFromBackground() {
+    const origin = window.location.origin;
+    const sRes = await sendMessagePromise({
+      type: MessageTypes.SETTINGS_GET,
+      payload: {}
+    });
+    const settings = sRes?.ok ? sRes.settings : null;
+    const enabled = isBadgeEnabledForOrigin(settings, origin);
+    setBadgeEnabledForThisSite(enabled);
+    if (!enabled) return;
+    ensureBadge();
+    setBadgeVisible(false);
+    const bRes = await sendMessagePromise({
+      type: MessageTypes.BADGE_STATUS_GET,
+      payload: { origin }
+    });
+    if (bRes?.ok && typeof bRes.hasNote === "boolean") {
+      setBadgeVisible(bRes.hasNote);
+    }
+  }
+
+  // core/content/index.js
+  console.log("Hello from Content Script on:", window.location.href);
+  function sendMessagePromise2(message) {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(message, (response) => {
+        const err = chrome.runtime.lastError;
+        if (err) return resolve(null);
+        resolve(response);
+      });
+    });
+  }
+  async function refreshHasNote() {
+    const origin = window.location.origin;
+    const bRes = await sendMessagePromise2({
+      type: MessageTypes.BADGE_STATUS_GET,
+      payload: { origin }
+    });
+    if (bRes?.ok && typeof bRes.hasNote === "boolean") {
+      setBadgeVisible(bRes.hasNote);
+    } else {
+      setBadgeVisible(false);
+    }
+  }
+  async function handleMessage(message) {
     if (!message || typeof message !== "object") return;
-
     const { type, payload } = message;
-
     switch (type) {
-      case MessageTypes.BADGE_SET: {
-        const hasNote = Boolean(payload?.hasNote);
-        setBadgeVisible(hasNote);
+      case ContentEventTypes.BADGE_SET: {
+        if (!isBadgeEnabledForThisSite()) return;
+        setBadgeVisible(Boolean(payload?.hasNote));
+        break;
+      }
+      case ContentEventTypes.BADGE_ENABLED_SET: {
+        const enabled = Boolean(payload?.enabled);
+        setBadgeEnabledForThisSite(enabled);
+        if (!enabled) {
+          setBadgeVisible(false);
+          return;
+        }
+        await refreshHasNote();
         break;
       }
       default:
-        // Unknown messages are ignored (future-proof)
         break;
     }
   }
-
-  chrome.runtime.sendMessage({ type: MessageTypes.BADGE_STATUS_GET, payload: { origin: window.location.origin } }, (response) => {
-    const err = chrome.runtime.lastError
-    if (err) {
-      // Optional: handle error (not critical)
-      return;
-    }
-    if (response?.ok && response.hasNote !== undefined) {
-      setBadgeVisible(response.hasNote);
-    }
-  });
-
-  // ----- Listen for updates from background -----
+  initBadgeFromBackground();
   chrome.runtime.onMessage.addListener((message) => {
     handleMessage(message);
-    // No async response needed here
   });
-
-  // Ensure badge exists (still hidden) so updates are instant
-  ensureBadge();
 })();
