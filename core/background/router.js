@@ -1,4 +1,4 @@
-// C:\Users\ASUS ZenBook\Documents\Portfolio Projects\NotExtension\core\background\router.js
+// core/background/router.js
 export function createRouter(handlersByType) {
   return async function route(message) {
     const { type, payload } = message ?? {};

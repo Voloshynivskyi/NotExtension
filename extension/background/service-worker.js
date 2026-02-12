@@ -18,14 +18,23 @@
 
   // core/shared/protocol.js
   var MessageTypes = Object.freeze({
+    // Notes
     NOTE_SET: "NOTE_SET",
     NOTE_GET: "NOTE_GET",
     NOTE_DELETE: "NOTE_DELETE",
+    // Badge
     BADGE_STATUS_GET: "BADGE_STATUS_GET",
+    // Settings
     SETTINGS_GET: "SETTINGS_GET",
-    SETTINGS_PATCH: "SETTINGS_PATCH"
+    SETTINGS_PATCH: "SETTINGS_PATCH",
+    // Highlights (storage / background)
+    HIGHLIGHTS_LIST: "HIGHLIGHTS_LIST",
+    HIGHLIGHT_CREATE: "HIGHLIGHT_CREATE",
+    HIGHLIGHT_DELETE: "HIGHLIGHT_DELETE",
+    HIGHLIGHTS_CLEAR_PAGE: "HIGHLIGHTS_CLEAR_PAGE"
   });
   var ContentEventTypes = Object.freeze({
+    // Badge events -> content
     BADGE_SET: "BADGE_SET",
     BADGE_ENABLED_SET: "BADGE_ENABLED_SET"
   });
@@ -187,6 +196,12 @@
     }
     return out;
   }
+  function normalizeTheme(v) {
+    return v === "dark" ? "dark" : "light";
+  }
+  function normalizeBool(v, fallback) {
+    return typeof v === "boolean" ? v : fallback;
+  }
   function normalizeBadge(badgeRaw) {
     const b = badgeRaw && typeof badgeRaw === "object" ? badgeRaw : {};
     const globalEnabled = typeof b.globalEnabled === "boolean" ? b.globalEnabled : true;
@@ -200,8 +215,8 @@
     const s = raw && typeof raw === "object" ? raw : {};
     return {
       _v: 1,
-      autosaveEnabled: typeof s.autosaveEnabled === "boolean" ? s.autosaveEnabled : true,
-      theme: s.theme === "dark" ? "dark" : "light",
+      autosaveEnabled: normalizeBool(s.autosaveEnabled, true),
+      theme: normalizeTheme(s.theme),
       badge: normalizeBadge(s.badge)
     };
   }
@@ -226,11 +241,101 @@
     };
   }
 
+  // core/background/handlers/highlights.js
+  var KEY = "highlights";
+  var DEFAULT = Object.freeze({
+    _v: 1,
+    byPage: {}
+    // { [pageKey]: Highlight[] }
+  });
+  function isPlainObject2(v) {
+    return v && typeof v === "object" && !Array.isArray(v);
+  }
+  function normalizePageUrl(raw) {
+    if (typeof raw !== "string" || raw.trim().length === 0) return "";
+    try {
+      const u = new URL(raw);
+      u.hash = "";
+      return u.toString();
+    } catch {
+      return raw.split("#")[0];
+    }
+  }
+  function normalizeStore(raw) {
+    const s = isPlainObject2(raw) ? raw : {};
+    const byPage = isPlainObject2(s.byPage) ? s.byPage : {};
+    return { _v: 1, byPage };
+  }
+  function makeId() {
+    return `hl_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  }
+  function normalizeColor(c) {
+    const v = typeof c === "string" ? c : "yellow";
+    return ["yellow", "green", "blue", "pink"].includes(v) ? v : "yellow";
+  }
+  function createHighlightsHandlers() {
+    return {
+      async [MessageTypes.HIGHLIGHTS_LIST](payload) {
+        const pageUrl = normalizePageUrl(payload?.pageUrl);
+        if (!pageUrl) return { ok: false, error: "pageUrl is required" };
+        const res = await storageGet([KEY]);
+        const store = normalizeStore(res?.[KEY] || DEFAULT);
+        const list = Array.isArray(store.byPage[pageUrl]) ? store.byPage[pageUrl] : [];
+        return { ok: true, highlights: list };
+      },
+      async [MessageTypes.HIGHLIGHT_CREATE](payload) {
+        const pageUrl = normalizePageUrl(payload?.pageUrl);
+        if (!pageUrl) return { ok: false, error: "pageUrl is required" };
+        const color = normalizeColor(payload?.color);
+        const anchor = isPlainObject2(payload?.anchor) ? payload.anchor : null;
+        if (!anchor) return { ok: false, error: "anchor is required" };
+        const res = await storageGet([KEY]);
+        const store = normalizeStore(res?.[KEY] || DEFAULT);
+        const created = {
+          id: makeId(),
+          pageUrl,
+          color,
+          anchor,
+          createdAt: Date.now()
+        };
+        const prev = Array.isArray(store.byPage[pageUrl]) ? store.byPage[pageUrl] : [];
+        const next = { ...store, byPage: { ...store.byPage, [pageUrl]: [created, ...prev] } };
+        await storageSet({ [KEY]: next });
+        return { ok: true, highlight: created };
+      },
+      async [MessageTypes.HIGHLIGHT_DELETE](payload) {
+        const pageUrl = normalizePageUrl(payload?.pageUrl);
+        const id = typeof payload?.id === "string" ? payload.id : "";
+        if (!pageUrl) return { ok: false, error: "pageUrl is required" };
+        if (!id) return { ok: false, error: "id is required" };
+        const res = await storageGet([KEY]);
+        const store = normalizeStore(res?.[KEY] || DEFAULT);
+        const prev = Array.isArray(store.byPage[pageUrl]) ? store.byPage[pageUrl] : [];
+        const filtered = prev.filter((h) => h?.id !== id);
+        const next = { ...store, byPage: { ...store.byPage, [pageUrl]: filtered } };
+        await storageSet({ [KEY]: next });
+        return { ok: true };
+      },
+      async [MessageTypes.HIGHLIGHTS_CLEAR_PAGE](payload) {
+        const pageUrl = normalizePageUrl(payload?.pageUrl);
+        if (!pageUrl) return { ok: false, error: "pageUrl is required" };
+        const res = await storageGet([KEY]);
+        const store = normalizeStore(res?.[KEY] || DEFAULT);
+        const byPage = { ...store.byPage };
+        delete byPage[pageUrl];
+        const next = { ...store, byPage };
+        await storageSet({ [KEY]: next });
+        return { ok: true };
+      }
+    };
+  }
+
   // core/background/index.js
   var handlers = {
     ...createNotesHandlers(),
     ...createBadgeHandlers(),
-    ...createSettingsHandlers()
+    ...createSettingsHandlers(),
+    ...createHighlightsHandlers()
   };
   var route = createRouter(handlers);
   console.log("Background Service Worker started \u{1F680}");

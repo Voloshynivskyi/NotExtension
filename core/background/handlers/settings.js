@@ -1,4 +1,5 @@
-// core/background/handlers/settings.js
+// File: core/background/handlers/settings.js
+// Purpose: Read, normalize, and update extension settings in storage.
 import { MessageTypes } from "../../shared/protocol.js";
 import { storageGet, storageSet } from "../../shared/storage.js";
 
@@ -15,9 +16,11 @@ const DEFAULT_SETTINGS = Object.freeze({
 });
 
 // Simple deepMerge for nested sections.
+// Check for a plain object value.
 function isPlainObject(v) {
   return v && typeof v === "object" && !Array.isArray(v);
 }
+// Merge nested objects while preserving non-object values.
 function deepMerge(base, patch) {
   const out = { ...(base || {}) };
   for (const [k, v] of Object.entries(patch || {})) {
@@ -27,13 +30,16 @@ function deepMerge(base, patch) {
   return out;
 }
 
+// Normalize theme values to the known set.
 function normalizeTheme(v) {
   return v === "dark" ? "dark" : "light";
 }
+// Normalize booleans with a fallback.
 function normalizeBool(v, fallback) {
   return typeof v === "boolean" ? v : fallback;
 }
 
+// Normalize badge settings and sanitize disabled origins.
 function normalizeBadge(badgeRaw) {
   const b = badgeRaw && typeof badgeRaw === "object" ? badgeRaw : {};
   const globalEnabled = typeof b.globalEnabled === "boolean" ? b.globalEnabled : true;
@@ -46,17 +52,18 @@ function normalizeBadge(badgeRaw) {
   return { globalEnabled, disabledOrigins };
 }
 
+// Normalize raw settings to the current schema.
 function normalizeSettings(raw) {
   const s = raw && typeof raw === "object" ? raw : {};
   return {
     _v: 1,
-    autosaveEnabled: typeof s.autosaveEnabled === "boolean" ? s.autosaveEnabled : true,
-    theme: s.theme === "dark" ? "dark" : "light",
+    autosaveEnabled: normalizeBool(s.autosaveEnabled, true),
+    theme: normalizeTheme(s.theme),
     badge: normalizeBadge(s.badge),
   };
 }
 
-
+// Build handlers for settings message types.
 export function createSettingsHandlers() {
   return {
     async [MessageTypes.SETTINGS_GET]() {

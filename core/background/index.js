@@ -1,12 +1,15 @@
-// C:\Users\ASUS ZenBook\Documents\Portfolio Projects\NotExtension\core\background\index.js
+// core/background/index.js
 import { createRouter } from "./router.js";
 import { createNotesHandlers } from "./handlers/notes.js";
 import { createBadgeHandlers } from "./handlers/badge.js";
 import { createSettingsHandlers } from "./handlers/settings.js";
+import { createHighlightsHandlers } from "./handlers/highlights.js";
+
 const handlers = {
   ...createNotesHandlers(),
   ...createBadgeHandlers(),
   ...createSettingsHandlers(),
+  ...createHighlightsHandlers(),
 };
 
 const route = createRouter(handlers);
