@@ -1,43 +1,64 @@
-/* C:\Users\ASUS ZenBook\Documents\Portfolio Projects\NotExtension\popup\src\index.css */
-
 :root {
-  font-family:
-    system-ui,
-    -apple-system,
-    Segoe UI,
-    Roboto,
-    Arial,
-    sans-serif;
-  line-height: 1.4;
-  font-weight: 400;
+  --ne-accent: #6e5dd0;
+  --ne-accent-strong: #7766dc;
 
-  color-scheme: light;
+  --ne-bg: #ffffff;
+  --ne-surface: #f6f4ff;
+  --ne-surface-2: #f0edff;
+  --ne-fg: #353434;
+  --ne-muted: #4c4b4b;
+  --ne-border: rgba(53, 52, 52, 0.16);
+  --ne-shadow: 0 10px 30px rgba(53, 52, 52, 0.14);
+
+  --ne-hover: rgba(53, 52, 52, 0.06);
+  --ne-active: rgba(53, 52, 52, 0.1);
+  --ne-focus: rgba(110, 93, 208, 0.35);
+
+  --ne-accent-soft: rgba(110, 93, 208, 0.12);
+  --ne-accent-soft-hover: rgba(110, 93, 208, 0.18);
+  --ne-danger: #e64d4d;
+  --ne-danger-soft: rgba(230, 77, 77, 0.12);
+}
+
+[data-theme="dark"] {
+  --ne-bg: #0f1116;
+  --ne-surface: #151a22;
+  --ne-surface-2: #1c2230;
+  --ne-fg: rgba(255, 255, 255, 0.92);
+  --ne-muted: rgba(255, 255, 255, 0.62);
+  --ne-border: rgba(255, 255, 255, 0.14);
+  --ne-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+
+  --ne-hover: rgba(255, 255, 255, 0.06);
+  --ne-active: rgba(255, 255, 255, 0.1);
+  --ne-focus: rgba(110, 93, 208, 0.45);
+
+  --ne-accent-soft: rgba(110, 93, 208, 0.18);
+  --ne-accent-soft-hover: rgba(110, 93, 208, 0.26);
+  --ne-danger-soft: rgba(230, 77, 77, 0.18);
 }
 
 html,
 body {
   margin: 0;
   padding: 0;
-  width: 100%;
-  height: 100%;
-  background: #fff;
-  color: #111;
+  background: var(--ne-bg);
+  color: var(--ne-fg);
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    Arial;
 }
 
 #root {
-  width: 100%;
-  height: 100%;
+  background: var(--ne-bg);
+  color: var(--ne-fg);
 }
 
-button {
-  font: inherit;
-  color: inherit;
-}
-
-.noteTextarea::-webkit-resizer {
-  display: none;
-}
-.noteTextarea {
-  resize: vertical;
-  overflow: auto;
+:where(button, input, textarea):focus-visible {
+  outline: 2px solid var(--ne-focus);
+  outline-offset: 2px;
 }

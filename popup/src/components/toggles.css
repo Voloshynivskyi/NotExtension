@@ -1,22 +1,12 @@
-/* popup/src/components/toggles/toggles.css */
-
-:root {
-  --ne-border: rgba(0, 0, 0, 0.1);
-  --ne-text: #121821;
-  --ne-muted: #6b7280;
-  --ne-bg: rgba(255, 255, 255, 0.92);
-
-  --ne-on: #175cd3;
-  --ne-off: rgba(0, 0, 0, 0.22);
-}
+/* popup/src/components/toggles.css */
 
 .neTgl {
   height: 22px;
   padding: 0 8px;
   border-radius: 999px;
   border: 1px solid var(--ne-border);
-  background: var(--ne-bg);
-  color: var(--ne-text);
+  background: var(--ne-surface);
+  color: var(--ne-fg);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -24,10 +14,10 @@
   user-select: none;
   font-size: 11px;
   line-height: 1;
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06);
   transition:
     transform 120ms ease,
-    border-color 120ms ease;
+    border-color 120ms ease,
+    background 120ms ease;
 }
 
 .neTgl:active {
@@ -37,11 +27,10 @@
 .neTgl--disabled {
   opacity: 0.55;
   cursor: not-allowed;
-  box-shadow: none;
 }
 
 .neTglLabel {
-  font-weight: 600;
+  font-weight: 700;
   color: var(--ne-muted);
 }
 
@@ -51,15 +40,17 @@
   border-radius: 999px;
   position: relative;
   border: 1px solid var(--ne-border);
-  background: rgba(0, 0, 0, 0.08);
-  transition: background 160ms ease;
+  background: var(--ne-hover);
+  transition:
+    background 160ms ease,
+    border-color 160ms ease;
 }
 
 .neKnob {
   width: 12px;
   height: 12px;
   border-radius: 999px;
-  background: #fff;
+  background: var(--ne-bg);
   position: absolute;
   top: 1px;
   left: 1px;
@@ -68,26 +59,30 @@
 }
 
 .neTgl--on .neSwitch {
-  background: rgba(23, 92, 211, 0.25);
+  background: var(--ne-accent-soft);
+  border-color: var(--ne-focus);
 }
 
 .neTgl--on .neKnob {
   transform: translateX(14px);
 }
 
+/* Theme toggle */
 .neTheme {
   height: 22px;
   width: 44px;
   border-radius: 999px;
   border: 1px solid var(--ne-border);
-  background: var(--ne-bg);
+  background: var(--ne-surface);
   cursor: pointer;
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06);
-  transition: transform 120ms ease;
+  transition:
+    transform 120ms ease,
+    background 120ms ease,
+    border-color 120ms ease;
 }
 
 .neTheme:active {
@@ -97,14 +92,13 @@
 .neTheme--disabled {
   opacity: 0.55;
   cursor: not-allowed;
-  box-shadow: none;
 }
 
 .neThemeTrack {
   position: absolute;
   inset: 3px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.08);
+  background: var(--ne-hover);
 }
 
 .neThemeKnob {
@@ -114,7 +108,7 @@
   width: 16px;
   height: 16px;
   border-radius: 999px;
-  background: #fff;
+  background: var(--ne-bg);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
   transition: transform 180ms ease;
 }
@@ -123,10 +117,12 @@
   position: relative;
   z-index: 1;
   opacity: 0.92;
+  color: var(--ne-fg);
 }
 
 .neTheme--dark .neThemeTrack {
-  background: rgba(23, 92, 211, 0.25);
+  background: var(--ne-accent-soft);
+  border-color: var(--ne-focus);
 }
 
 .neTheme--dark .neThemeKnob {

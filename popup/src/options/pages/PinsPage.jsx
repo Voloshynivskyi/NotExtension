@@ -2,49 +2,44 @@
 import React from "react";
 import { SettingsCard } from "../components/SettingsCard";
 import { SettingsRow } from "../components/SettingsRow";
-import { Toggle, Select, Pill } from "../components/Controls";
+import { Toggle, Pill } from "../components/Controls";
 
-export function PinsPage() {
+export function PinsPage({ settings }) {
+  const highlightsEnabled = settings.modules?.highlights ?? true;
+  const pinsEnabled = settings.modules?.pins ?? true;
+
+  const disabled = !highlightsEnabled;
+
   return (
     <>
       <SettingsCard
         title="Pins"
-        description="Pins anchored to text/highlights (planned)."
-        right={<Pill tone="blue">Planned</Pill>}
+        description="Pins are a property of highlights (pinned=true/false)."
+        right={<Pill tone="neutral">MVP</Pill>}
       >
         <SettingsRow
           label="Enable pins"
-          hint="Allows creating pins on pages."
-          disabled
-          control={<Toggle checked={false} onChange={() => {}} disabled />}
-        />
-
-        <SettingsRow
-          label="Pin size"
-          hint="Small / medium / large."
-          disabled
+          hint={
+            disabled
+              ? "Pins require Highlights. Enable highlights first."
+              : "Applies instantly to currently opened tabs."
+          }
           control={
-            <Select
-              value="m"
-              onChange={() => {}}
-              disabled
-              options={[
-                { value: "s", label: "Small" },
-                { value: "m", label: "Medium" },
-                { value: "l", label: "Large" },
-              ]}
+            <Toggle
+              checked={Boolean(pinsEnabled)}
+              disabled={disabled}
+              onChange={(v) => settings.setModuleEnabled("pins", v)}
             />
           }
         />
       </SettingsCard>
 
       <SettingsCard
-        title="Recommended MVP"
-        description="Pins should attach to selected text (quote + context), not absolute coordinates."
+        title="Note"
+        description="Pins UI (panel + popover) can be extended later."
       >
         <div className="opt-muted">
-          This way pins won't shift during resize/scroll and will be restored
-          after a page reload.
+          When Highlights are disabled, Pins are forced off automatically.
         </div>
       </SettingsCard>
     </>

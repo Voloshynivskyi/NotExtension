@@ -10,12 +10,24 @@ export function SettingsLayout({
   children,
   loading,
 }) {
+  let logoUrl = "";
+  try {
+    logoUrl = chrome?.runtime?.getURL?.("icons/icon-32.png") || "";
+  } catch {
+    logoUrl = "";
+  }
+
   return (
     <div className="opt-root">
       <header className="opt-header">
         <div className="opt-brand">
-          <div className="opt-title">
-            {title} <span className="opt-subtitle">{subtitle}</span>
+          <div className="opt-brand-row">
+            {logoUrl ? (
+              <img className="opt-logo" src={logoUrl} alt="NotExtension" />
+            ) : null}
+            <div className="opt-title">
+              {title} <span className="opt-subtitle">{subtitle}</span>
+            </div>
           </div>
           <div className="opt-caption">
             {loading

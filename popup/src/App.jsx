@@ -9,7 +9,7 @@ import { useSettings } from "./hooks/useSettings";
 export default function App() {
   const settings = useSettings();
   const note = usePopupNote({ autosaveEnabled: settings.autosaveEnabled });
-  const resize = useBottomResize({ initial: 320 });
+  const resize = useBottomResize({ initial: 200 });
   const badgeEnabledForSite = settings.isBadgeEnabledForOrigin(note.origin);
 
   React.useEffect(() => {

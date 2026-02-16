@@ -1,6 +1,9 @@
 // File: core/content/highlights/anchor.js
 // Purpose: Build a DOM + quote anchor for a text selection.
-const UI_ATTR = "data-notextension-ui";
+// Important: We MUST NOT anchor inside our own highlight marks, otherwise we can create duplicates
+// and unstable XPaths like ".../mark[1]/text()[1]".
+
+import { UI_ATTR, HIGHLIGHT_CLASS } from "./constants.js";
 
 // Check if a node is a text node.
 function isText(n) {
@@ -32,8 +35,14 @@ function collectTextNodesInRange(range) {
         const parent = node.parentElement;
         if (!parent) return NodeFilter.FILTER_REJECT;
 
+        // Ignore non-content contexts
         if (parent.closest("script, style, noscript")) return NodeFilter.FILTER_REJECT;
+
+        // Ignore any of our injected UI
         if (parent.closest(`[${UI_ATTR}]`)) return NodeFilter.FILTER_REJECT;
+
+        // ✅ Critical: never anchor inside existing highlights (prevents duplicates)
+        if (parent.closest(`mark.${HIGHLIGHT_CLASS}[data-hid]`)) return NodeFilter.FILTER_REJECT;
 
         try {
           if (!range.intersectsNode(node)) return NodeFilter.FILTER_REJECT;
@@ -44,7 +53,7 @@ function collectTextNodesInRange(range) {
         return NodeFilter.FILTER_ACCEPT;
       },
     },
-    false,
+    false
   );
 
   let n = walker.nextNode();

@@ -33,10 +33,18 @@ export function listHighlights({ pageUrl }) {
 }
 
 // Create a highlight for a page.
-export function createHighlight({ pageUrl, color, anchor }) {
+export function createHighlight({ pageUrl, color, anchor, pinned, noteText }) {
   return sendMessagePromise({
     type: MessageTypes.HIGHLIGHT_CREATE,
-    payload: { pageUrl, color, anchor },
+    payload: { pageUrl, color, anchor, pinned, noteText },
+  });
+}
+
+// Patch a highlight for a page (pinned/noteText/color).
+export function patchHighlight({ pageUrl, id, patch }) {
+  return sendMessagePromise({
+    type: MessageTypes.HIGHLIGHT_PATCH,
+    payload: { pageUrl, id, patch },
   });
 }
 

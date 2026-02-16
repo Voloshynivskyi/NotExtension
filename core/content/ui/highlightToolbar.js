@@ -1,46 +1,71 @@
 // File: core/content/ui/highlightToolbar.js
-// Purpose: Render and position the in-page highlight toolbar UI.
-const TOOLBAR_ID = "notext-hl-toolbar";
-const STYLE_ID = "notext-hl-style";
-const UI_ATTR = "data-notextension-ui";
+// Purpose: Provide a floating toolbar for highlight actions.
+import {
+  TOOLBAR_ID,
+  TOOLBAR_STYLE_ID,
+  UI_ATTR,
+  Z_INDEX,
+} from "../highlights/constants.js";
 
-// Ensure the toolbar styles are injected once.
 function ensureStyle() {
-  if (document.getElementById(STYLE_ID)) return;
+  if (document.getElementById(TOOLBAR_STYLE_ID)) return;
 
   const style = document.createElement("style");
-  style.id = STYLE_ID;
+  style.id = TOOLBAR_STYLE_ID;
   style.textContent = `
-    #${TOOLBAR_ID}{
+    #${TOOLBAR_ID} {
       position: fixed;
-      z-index: 2147483647;
+      z-index: ${Z_INDEX};
       display: none;
       padding: 6px;
       border-radius: 10px;
-      border: 1px solid rgba(0,0,0,0.12);
-      background: rgba(255,255,255,0.92);
-      backdrop-filter: blur(8px);
-      box-shadow: 0 10px 24px rgba(0,0,0,0.16);
+      background: rgba(17, 24, 39, 0.96);
+      box-shadow: 0 10px 24px rgba(0,0,0,0.22);
       user-select: none;
+      gap: 6px;
+      align-items: center;
+      max-width: min(520px, calc(100vw - 24px));
     }
-    #${TOOLBAR_ID} button{
-      height: 28px;
-      padding: 0 10px;
-      border-radius: 8px;
-      border: 1px solid rgba(0,0,0,0.12);
-      background: #fff;
+
+    #${TOOLBAR_ID} .notext-btn {
+      all: unset;
       cursor: pointer;
-      font: 600 12px/1 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      padding: 6px 10px;
+      border-radius: 8px;
+      color: white;
+      font: 12px/1 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: rgba(255,255,255,0.10);
+      user-select: none;
+      border: 1px solid transparent;
     }
-    #${TOOLBAR_ID} button:hover{
-      background: rgba(0,0,0,0.04);
+
+    #${TOOLBAR_ID} .notext-btn:hover {
+      background: rgba(255,255,255,0.18);
+    }
+
+    #${TOOLBAR_ID} .notext-btn.danger {
+      background: rgba(239,68,68,0.18);
+    }
+    #${TOOLBAR_ID} .notext-btn.danger:hover {
+      background: rgba(239,68,68,0.28);
+    }
+
+    #${TOOLBAR_ID} .notext-status {
+      margin-left: 6px;
+      font: 11px/1.1 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color: rgba(255,255,255,0.85);
+      opacity: 0.95;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: none;
+      max-width: 240px;
     }
   `;
   (document.head || document.documentElement).appendChild(style);
 }
 
-// Create or reuse the toolbar element and wire the click handler.
-function ensureToolbar(onClick) {
+function ensureToolbar({ onHighlight, onPin, onRemove, onClick }) {
   let el = document.getElementById(TOOLBAR_ID);
   if (el) return el;
 
@@ -49,62 +74,128 @@ function ensureToolbar(onClick) {
   el = document.createElement("div");
   el.id = TOOLBAR_ID;
   el.setAttribute(UI_ATTR, "1");
+  el.style.display = "none";
 
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.textContent = "Highlight";
-  btn.setAttribute(UI_ATTR, "1");
-  btn.addEventListener("click", onClick);
+  // Backward-compatible:
+  // - old usage: createHighlightToolbar({ onClick })
+  // - new usage: createHighlightToolbar({ onHighlight, onPin, onRemove })
+  const handleHighlight = typeof onHighlight === "function" ? onHighlight : onClick;
 
-  el.appendChild(btn);
+  const btnHl = document.createElement("button");
+  btnHl.type = "button";
+  btnHl.className = "notext-btn";
+  btnHl.textContent = "Highlight";
+  btnHl.setAttribute(UI_ATTR, "1");
+  btnHl.dataset.role = "highlight";
+  if (typeof handleHighlight === "function") {
+    btnHl.addEventListener("click", handleHighlight);
+  }
+
+  el.appendChild(btnHl);
+
+  if (typeof onPin === "function") {
+    const btnPin = document.createElement("button");
+    btnPin.type = "button";
+    btnPin.className = "notext-btn";
+    btnPin.textContent = "📌 Pin";
+    btnPin.setAttribute(UI_ATTR, "1");
+    btnPin.dataset.role = "pin";
+    btnPin.addEventListener("click", onPin);
+    el.appendChild(btnPin);
+  }
+
+  if (typeof onRemove === "function") {
+    const btnRm = document.createElement("button");
+    btnRm.type = "button";
+    btnRm.className = "notext-btn danger";
+    btnRm.textContent = "Remove";
+    btnRm.setAttribute(UI_ATTR, "1");
+    btnRm.dataset.role = "remove";
+    btnRm.addEventListener("click", onRemove);
+    el.appendChild(btnRm);
+  }
+
+  const status = document.createElement("span");
+  status.className = "notext-status";
+  status.setAttribute(UI_ATTR, "1");
+  status.textContent = "";
+  el.appendChild(status);
+
   (document.body || document.documentElement).appendChild(el);
   return el;
 }
 
-// Prefer a visible client rect when the bounding box is empty.
 function getRectForRange(range) {
   const rects = range.getClientRects?.();
   if (rects && rects.length > 0) return rects[0];
-  return range.getBoundingClientRect();
+  const r = range.getBoundingClientRect?.();
+  if (!r || (r.width === 0 && r.height === 0)) return null;
+  return r;
 }
 
-// Public API for controlling the toolbar lifecycle.
-export function createHighlightToolbar({ onClick }) {
-  const el = ensureToolbar(onClick);
+export function createHighlightToolbar({ onHighlight, onPin, onRemove, onClick }) {
+  const el = ensureToolbar({ onHighlight, onPin, onRemove, onClick });
+  const statusEl = el.querySelector(".notext-status");
 
-  return {
-    // Show the toolbar near the given range.
-    showNearRange(range) {
-      const rect = getRectForRange(range);
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
+  function showNearRange(range, pointer) {
+    el.style.display = "flex";
 
-      el.style.display = "block";
+    const pad = 8;
+    const w = el.offsetWidth || 120;
+    const h = el.offsetHeight || 32;
 
-      const tw = el.offsetWidth || 90;
-      const th = el.offsetHeight || 40;
+    if (pointer && Date.now() - pointer.ts < 1500) {
+      let left = pointer.x + 10;
+      let top = pointer.y + 12;
 
-      // Center horizontally on the selection.
-      let left = rect.left + rect.width / 2 - tw / 2;
-      left = Math.max(8, Math.min(vw - tw - 8, left));
-
-      // Prefer above the selection; fall back below if there is no room.
-      let top = rect.top - th - 10;
-      if (top < 8) top = rect.bottom + 10;
-      top = Math.max(8, Math.min(vh - th - 8, top));
+      left = Math.max(pad, Math.min(left, window.innerWidth - w - pad));
+      top = Math.max(pad, Math.min(top, window.innerHeight - h - pad));
 
       el.style.left = `${Math.round(left)}px`;
       el.style.top = `${Math.round(top)}px`;
-    },
+      return;
+    }
 
-    // Hide the toolbar.
+    const rect = getRectForRange(range);
+    if (!rect) {
+      el.style.display = "none";
+      return;
+    }
+
+    let left = rect.left + rect.width / 2 - w / 2;
+    let top = rect.bottom + pad;
+
+    left = Math.max(pad, Math.min(left, window.innerWidth - w - pad));
+    top = Math.max(pad, Math.min(top, window.innerHeight - h - pad));
+
+    el.style.left = `${Math.round(left)}px`;
+    el.style.top = `${Math.round(top)}px`;
+  }
+
+  function setStatus(text) {
+    if (!statusEl) return;
+    const t = String(text || "").trim();
+    statusEl.textContent = t;
+    statusEl.style.display = t ? "inline-block" : "none";
+  }
+
+  function clearStatus() {
+    setStatus("");
+  }
+
+  return {
+    showNearRange,
     hide() {
       el.style.display = "none";
+      clearStatus();
     },
-
-    // Check if an event target is inside the toolbar UI.
+    isVisible() {
+      return el.style.display !== "none";
+    },
     isEventInsideUI(target) {
       return Boolean(target?.closest?.(`#${TOOLBAR_ID}`));
     },
+    setStatus,
+    clearStatus,
   };
 }

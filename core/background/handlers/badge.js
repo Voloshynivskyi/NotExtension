@@ -1,7 +1,7 @@
 // C:\Users\ASUS ZenBook\Documents\Portfolio Projects\NotExtension\core\background\handlers\badge.js
 import { ContentEventTypes, MessageTypes } from "../../shared/protocol.js";
 import { storageGet } from "../../shared/storage.js";
-import { tabOrigin } from "../../shared/url.js";
+import { tabOrigin } from "../../shared/url.js"
 
 async function getAllTabs() {
   return new Promise((resolve, reject) => {

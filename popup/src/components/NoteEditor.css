@@ -1,0 +1,26 @@
+/* popup/src/components/NoteEditor.css */
+.neNoteEditor {
+  width: 100%;
+  box-sizing: border-box;
+  border: none;
+  outline: none;
+  padding: 10px 10px 22px 10px;
+
+  font-size: 14px;
+  line-height: 1.45;
+  font-family: inherit;
+
+  resize: none;
+  background: var(--ne-bg);
+  color: var(--ne-fg);
+}
+
+.neNoteEditor::placeholder {
+  color: var(--ne-muted);
+}
+
+.neNoteEditor:disabled {
+  opacity: 0.75;
+  background: var(--ne-surface);
+  color: var(--ne-muted);
+}

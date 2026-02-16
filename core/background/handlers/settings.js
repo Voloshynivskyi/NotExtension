@@ -2,65 +2,15 @@
 // Purpose: Read, normalize, and update extension settings in storage.
 import { MessageTypes } from "../../shared/protocol.js";
 import { storageGet, storageSet } from "../../shared/storage.js";
+import {
+  SETTINGS_KEY,
+  DEFAULT_SETTINGS,
+  normalizeSettings,
+  applySettingsPatch,
+} from "../../shared/settingsSchema.js";
 
-const SETTINGS_KEY = "settings";
-
-const DEFAULT_SETTINGS = Object.freeze({
-  _v: 1,
-  autosaveEnabled: true,
-  theme: "light",
-  badge: {
-    globalEnabled: true,
-    disabledOrigins: [],
-  },
-});
-
-// Simple deepMerge for nested sections.
-// Check for a plain object value.
 function isPlainObject(v) {
   return v && typeof v === "object" && !Array.isArray(v);
-}
-// Merge nested objects while preserving non-object values.
-function deepMerge(base, patch) {
-  const out = { ...(base || {}) };
-  for (const [k, v] of Object.entries(patch || {})) {
-    if (isPlainObject(v) && isPlainObject(out[k])) out[k] = deepMerge(out[k], v);
-    else out[k] = v;
-  }
-  return out;
-}
-
-// Normalize theme values to the known set.
-function normalizeTheme(v) {
-  return v === "dark" ? "dark" : "light";
-}
-// Normalize booleans with a fallback.
-function normalizeBool(v, fallback) {
-  return typeof v === "boolean" ? v : fallback;
-}
-
-// Normalize badge settings and sanitize disabled origins.
-function normalizeBadge(badgeRaw) {
-  const b = badgeRaw && typeof badgeRaw === "object" ? badgeRaw : {};
-  const globalEnabled = typeof b.globalEnabled === "boolean" ? b.globalEnabled : true;
-
-  const arr = Array.isArray(b.disabledOrigins) ? b.disabledOrigins : [];
-  const disabledOrigins = Array.from(
-    new Set(arr.filter((x) => typeof x === "string" && x.trim().length > 0))
-  );
-
-  return { globalEnabled, disabledOrigins };
-}
-
-// Normalize raw settings to the current schema.
-function normalizeSettings(raw) {
-  const s = raw && typeof raw === "object" ? raw : {};
-  return {
-    _v: 1,
-    autosaveEnabled: normalizeBool(s.autosaveEnabled, true),
-    theme: normalizeTheme(s.theme),
-    badge: normalizeBadge(s.badge),
-  };
 }
 
 // Build handlers for settings message types.
@@ -69,6 +19,7 @@ export function createSettingsHandlers() {
     async [MessageTypes.SETTINGS_GET]() {
       const res = await storageGet([SETTINGS_KEY]);
       const stored = res?.[SETTINGS_KEY];
+
       const settings = normalizeSettings(stored || DEFAULT_SETTINGS);
 
       // If no settings exist yet, store defaults immediately.
@@ -83,9 +34,8 @@ export function createSettingsHandlers() {
       const res = await storageGet([SETTINGS_KEY]);
       const current = normalizeSettings(res?.[SETTINGS_KEY] || DEFAULT_SETTINGS);
 
-      // Patch can be nested; use deep merge.
-      const merged = deepMerge(current, patch);
-      const next = normalizeSettings(merged);
+      // Apply patch and enforce invariants (e.g., pins require highlights).
+      const next = applySettingsPatch(current, patch);
 
       await storageSet({ [SETTINGS_KEY]: next });
       return { ok: true, settings: next };

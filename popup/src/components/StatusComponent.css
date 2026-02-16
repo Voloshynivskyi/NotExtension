@@ -9,10 +9,8 @@
   line-height: 1;
   user-select: none;
 
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(0, 0, 0, 0.1);
-
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06);
+  background: var(--ne-surface);
+  border: 1px solid var(--ne-border);
 }
 
 .neMiniText {
@@ -36,7 +34,7 @@
   height: 8px;
   border-radius: 999px;
   background: currentColor;
-  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 0 0 3px var(--ne-hover);
 }
 
 .neMiniStatus--ready {
@@ -49,14 +47,14 @@
   color: #ef4444;
 }
 .neMiniStatus--deleted {
-  color: #2563eb;
+  color: var(--ne-accent);
 }
 
 .neMiniStatus--loading {
-  color: #6b7280;
+  color: var(--ne-muted);
 }
 .neMiniStatus--saving {
-  color: #7c3aed;
+  color: var(--ne-accent);
 }
 .neMiniStatus--deleting {
   color: #f97316;
@@ -66,7 +64,7 @@
   width: 12px;
   height: 12px;
   border-radius: 999px;
-  border: 2px solid rgba(0, 0, 0, 0.16);
+  border: 2px solid var(--ne-border);
   border-top-color: currentColor;
   animation: neSpin 0.9s linear infinite;
 }

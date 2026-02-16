@@ -1,6 +1,6 @@
 // C:\Users\ASUS ZenBook\Documents\Portfolio Projects\NotExtension\popup\src\extension\notesApi.js
 import { sendToBackground } from "./client";
-import { MessageTypes } from "./protocol";
+import { MessageTypes } from "@core/shared/protocol";
 
 export async function getNote(origin) {
   return await sendToBackground({

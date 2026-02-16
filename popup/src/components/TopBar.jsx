@@ -50,29 +50,48 @@ export function TopBar({
 }) {
   const uiState = mapToUiState(status?.kind, statusText);
   const isDark = theme === "dark";
-
   const togglesDisabled = !settingsLoaded;
+  let logoUrl = "";
+  try {
+    logoUrl = chrome?.runtime?.getURL?.("icons/icon-32.png") || "";
+  } catch {
+    logoUrl = "";
+  }
 
   return (
     <div
       style={{
-        padding: "8px 10px 8px 10px",
-        borderBottom: "1px solid rgba(0,0,0,0.08)",
+        padding: "8px 10px",
+        borderBottom: "1px solid var(--ne-border)",
         display: "grid",
         gridTemplateColumns: "1fr auto",
         gap: 8,
         alignItems: "start",
+        background: "var(--ne-bg)",
       }}
     >
       <div style={{ minWidth: 0 }}>
         <div
           style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
             fontSize: 13,
-            fontWeight: 700,
-            color: "#111",
+            fontWeight: 800,
+            color: "var(--ne-fg)",
             lineHeight: 1.1,
+            letterSpacing: "-0.2px",
           }}
         >
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt="NotExtension"
+              width={18}
+              height={18}
+              style={{ borderRadius: 5, border: "1px solid var(--ne-border)" }}
+            />
+          ) : null}
           NotExtension
         </div>
 
@@ -80,14 +99,14 @@ export function TopBar({
           style={{
             marginTop: 4,
             fontSize: 12,
-            color: "#666",
+            color: "var(--ne-muted)",
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
           }}
           title={origin}
         >
-          Site: <span style={{ color: "#111" }}>{origin || "…"}</span>
+          Site: <span style={{ color: "var(--ne-fg)" }}>{origin || "…"}</span>
         </div>
 
         <div style={{ marginTop: 6 }}>
@@ -105,43 +124,48 @@ export function TopBar({
           marginTop: 2,
         }}
       >
+        {/* Badge */}
         <IconButton
           title={badgeEnabled ? "Badge: ON" : "Badge: OFF"}
           onClick={onToggleBadge}
           disabled={togglesDisabled}
           active={badgeEnabled}
           tone="blue"
-          iconColor={badgeEnabled ? "#2563eb" : "#6b7280"}
+          iconColor="var(--ne-muted)"
+          activeIconColor="var(--ne-accent)"
         >
           {badgeEnabled ? <BadgeCheck size={16} /> : <BadgeX size={16} />}
         </IconButton>
 
+        {/* Autosave */}
         <IconButton
           title={autosaveEnabled ? "Autosave: ON" : "Autosave: OFF"}
           onClick={onToggleAutosave}
           disabled={togglesDisabled}
           active={autosaveEnabled}
           tone="yellow"
-          iconColor={autosaveEnabled ? "#f59e0b" : "#6b7280"}
+          iconColor="var(--ne-muted)"
+          activeIconColor="#f59e0b"
         >
           {autosaveEnabled ? <Zap size={16} /> : <ZapOff size={16} />}
         </IconButton>
 
+        {/* Theme */}
         <IconButton
           title={isDark ? "Theme: Dark" : "Theme: Light"}
           onClick={onToggleTheme}
           disabled={togglesDisabled}
           active={isDark}
-          tone={isDark ? "dark" : "neutral"}
-          bg="transparent"
-          activeBg="#111827"
-          activeBorderColor="rgba(255,255,255,0.18)"
+          tone="neutral"
+          activeBg="var(--ne-surface-2)"
+          activeBorderColor="var(--ne-border)"
           iconColor={isDark ? "#fbbf24" : "#f59e0b"}
           activeIconColor="#fbbf24"
         >
           {isDark ? <Moon size={16} /> : <Sun size={16} />}
         </IconButton>
 
+        {/* Save / Delete / Settings */}
         <IconButton
           title="Save"
           onClick={onSave}

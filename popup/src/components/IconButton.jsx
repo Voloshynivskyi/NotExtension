@@ -3,34 +3,39 @@ import React from "react";
 
 const TONES = {
   neutral: {
-    icon: "#111",
-    hoverBg: "rgba(0,0,0,0.04)",
-    activeBg: "rgba(0,0,0,0.06)",
-    activeBorder: "rgba(0,0,0,0.16)",
+    icon: "var(--ne-fg)",
+    hoverBg: "var(--ne-hover)",
+    activeBg: "var(--ne-active)",
+    activeBorder: "var(--ne-border)",
   },
+
+  // IMPORTANT: tone "blue" у нас тепер = бренд-акцент (фіолетовий)
   blue: {
-    icon: "#2563eb",
-    hoverBg: "rgba(37,99,235,0.10)",
-    activeBg: "rgba(37,99,235,0.14)",
-    activeBorder: "rgba(37,99,235,0.35)",
+    icon: "var(--ne-accent)",
+    hoverBg: "var(--ne-accent-soft)",
+    activeBg: "var(--ne-accent-soft-hover)",
+    activeBorder: "var(--ne-focus)",
   },
+
   yellow: {
     icon: "#f59e0b",
     hoverBg: "rgba(245,158,11,0.12)",
     activeBg: "rgba(245,158,11,0.16)",
     activeBorder: "rgba(245,158,11,0.40)",
   },
+
   danger: {
-    icon: "#b42318",
-    hoverBg: "rgba(239,68,68,0.10)",
-    activeBg: "rgba(239,68,68,0.14)",
-    activeBorder: "rgba(239,68,68,0.35)",
+    icon: "var(--ne-danger)",
+    hoverBg: "var(--ne-danger-soft)",
+    activeBg: "var(--ne-danger-soft)",
+    activeBorder: "rgba(230,77,77,0.45)",
   },
+
   dark: {
-    icon: "#e5e7eb",
-    hoverBg: "rgba(17,24,39,0.90)",
-    activeBg: "#111827",
-    activeBorder: "rgba(255,255,255,0.18)",
+    icon: "var(--ne-fg)",
+    hoverBg: "var(--ne-surface-2)",
+    activeBg: "var(--ne-surface-2)",
+    activeBorder: "var(--ne-border)",
   },
 };
 
@@ -50,7 +55,7 @@ export function IconButton({
 
   bg = "transparent",
   activeBg,
-  borderColor = "rgba(0,0,0,0.10)",
+  borderColor = "var(--ne-border)",
   activeBorderColor,
 
   style,
@@ -96,7 +101,7 @@ export function IconButton({
         cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.45 : 1,
         padding: 0,
-        color: resolvedIcon, // <- lucide icons read currentColor
+        color: resolvedIcon, // lucide icons read currentColor
         transition:
           "background 120ms ease, border-color 120ms ease, transform 80ms ease",
         ...style,

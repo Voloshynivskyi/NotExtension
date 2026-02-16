@@ -1,6 +1,6 @@
 // popup/src/extension/settingsApi.js
 import { sendToBackground } from "./client";
-import { MessageTypes } from "./protocol";
+import { MessageTypes } from "@core/shared/protocol";
 
 export async function getSettings() {
   return await sendToBackground({

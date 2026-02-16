@@ -1,6 +1,6 @@
 // popup/src/hooks/usePopupNote.jsx
 import React from "react";
-import { getOriginFromUrl } from "../shared/url";
+import { getOriginFromUrl } from "@core/shared/url";
 import * as notesApi from "../extension/notesApi";
 import { getActiveTab } from "../extension/tabs";
 

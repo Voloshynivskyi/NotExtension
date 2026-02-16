@@ -5,6 +5,20 @@ import path from "path";
 export default defineConfig({
   base: "./",
   plugins: [react()],
+
+  resolve: {
+    alias: {
+      "@core": path.resolve(__dirname, "../core"),
+    },
+  },
+
+  server: {
+    fs: {
+      // Allow serving files from the core directory for development.
+      allow: [path.resolve(__dirname, "..")],
+    },
+  },
+
   build: {
     outDir: path.resolve(__dirname, "../extension/popup"),
     emptyOutDir: true,
