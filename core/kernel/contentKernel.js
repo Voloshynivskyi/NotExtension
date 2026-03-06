@@ -15,6 +15,7 @@ import {
   setHighlightsEnabled,
   setPinsEnabled,
   syncHighlightsFromStore,
+  captureSelectionForContextMenu,
 } from "../content/highlights/index.js";
 
 import { refreshPinsPanel } from "../content/ui/pinsPanel.js";
@@ -93,80 +94,35 @@ export async function initContentKernel() {
     setBadgeVisible(false);
     const hasNote = await fetchHasNote(origin);
     setBadgeVisible(hasNote);
-  } else {
-    setBadgeVisible(false);
   }
 
-  // 4) Realtime sync: settings/theme + origin note changes => badge visibility
-  if (chrome?.storage?.onChanged) {
-    chrome.storage.onChanged.addListener((changes, areaName) => {
-      if (areaName !== "local") return;
+  // 4) Observe settings changes for realtime toggle/theme updates
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== "local") return;
+    if (!changes[SETTINGS_KEY]) return;
 
-      // SETTINGS changed => update theme + module gates + badge enablement
-      if (changes[SETTINGS_KEY]) {
-        const prevHighlights = Boolean(settings.modules?.highlights);
-        const prevPins = Boolean(settings.modules?.pins);
+    const nextSettings = normalizeSettings(changes[SETTINGS_KEY].newValue);
+    settings = nextSettings;
 
-        const nextRaw = changes[SETTINGS_KEY].newValue;
-        const next = normalizeSettings(nextRaw || DEFAULT_SETTINGS);
-        settings = next;
+    // Theme live-update
+    applyThemeToRoot(settings.theme);
 
-        applyThemeToRoot(settings.theme);
+    // Badge enabled by site rules
+    const enabledNow = isBadgeEnabledForOrigin(settings, origin);
+    setBadgeEnabledForThisSite(enabledNow);
 
-        const enabledNow = isBadgeEnabledForOrigin(settings, origin);
-        setBadgeEnabledForThisSite(enabledNow);
+    // Module gating
+    void setPinsEnabled(Boolean(settings.modules?.pins)).catch((e) =>
+      console.warn("setPinsEnabled failed:", e)
+    );
 
-        if (settings.modules?.badge && enabledNow) {
-          ensureBadge();
+    void setHighlightsEnabled(Boolean(settings.modules?.highlights)).catch((e) =>
+      console.warn("setHighlightsEnabled failed:", e)
+    );
+  });
 
-          // If note changed in same batch, prefer it
-          if (changes[origin]) {
-            setBadgeVisible(
-              computeHasNoteFromStorageValue(changes[origin].newValue)
-            );
-          } else {
-            // Otherwise refresh from background best-effort
-            void (async () => {
-              const hasNote = await fetchHasNote(origin);
-              setBadgeVisible(hasNote);
-            })();
-          }
-        } else {
-          setBadgeVisible(false);
-        }
-
-        const nextHighlights = Boolean(settings.modules?.highlights);
-        const nextPins = Boolean(settings.modules?.pins);
-
-        // Live gating for highlights/pins (no page reload)
-        void (async () => {
-          try {
-            if (prevPins !== nextPins) {
-              await setPinsEnabled(nextPins);
-            }
-            if (prevHighlights !== nextHighlights) {
-              await setHighlightsEnabled(nextHighlights);
-            }
-          } catch (e) {
-            console.warn("Live gating failed:", e);
-          }
-        })();
-      }
-
-      // NOTE changed (origin key) => update badge instantly
-      if (changes[origin]) {
-        const enabledNow = isBadgeEnabledForOrigin(settings, origin);
-        if (!settings.modules?.badge || !enabledNow) return;
-        ensureBadge();
-        setBadgeVisible(computeHasNoteFromStorageValue(changes[origin].newValue));
-      }
-    });
-  }
-
-  // 5) Runtime events from background (broadcast)
   async function handleMessage(message) {
-    if (!message || typeof message !== "object") return;
-    const { type, payload } = message;
+    const { type, payload } = message ?? {};
 
     switch (type) {
       case ContentEventTypes.BADGE_SET: {
@@ -216,9 +172,32 @@ export async function initContentKernel() {
     }
   }
 
-  chrome.runtime.onMessage.addListener((message) => {
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    // Request/response message used by background context-menu actions.
+    if (message?.type === MessageTypes.HIGHLIGHT_CAPTURE_SELECTION) {
+      void (async () => {
+        // Respect module gating (highlights must be enabled).
+        if (!settings.modules?.highlights) {
+          sendResponse({ ok: false, error: "highlights disabled" });
+          return;
+        }
+
+        try {
+          const res = captureSelectionForContextMenu();
+          sendResponse(res);
+        } catch (e) {
+          console.warn("captureSelectionForContextMenu failed:", e);
+          sendResponse({ ok: false, error: "capture failed" });
+        }
+      })();
+
+      return true; // keep SW channel open for async sendResponse
+    }
+
     void handleMessage(message).catch((e) =>
       console.warn("Content handleMessage failed:", e)
     );
+
+    return false;
   });
 }

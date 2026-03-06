@@ -4,9 +4,19 @@
   "scripts": {
     "build:core": "node scripts/build-core.mjs",
     "build:popup": "npm --prefix popup run build",
-    "build": "npm run build:core && npm run build:popup"
+    "build": "npm run build:core && npm run build:popup",
+    "lint": "eslint .",
+    "format": "prettier -w .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "ci": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build"
   },
   "devDependencies": {
-    "esbuild": "^0.25.0"
+    "@types/node": "^25.3.0",
+    "esbuild": "^0.25.0",
+    "eslint": "^10.0.1",
+    "prettier": "^3.8.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
   }
 }

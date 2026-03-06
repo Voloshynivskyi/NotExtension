@@ -379,6 +379,7 @@ export function closePinPopover() {
   }
 }
 
+
 export function isPinPopoverOpen() {
   return Boolean(state.open);
 }

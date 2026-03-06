@@ -1,7 +1,7 @@
 // core/kernel/backgoundKernel.js
 import { createRouter } from "../background/router.js";
 import { getFeatures } from "./featureRegistry.js";
-import { ContentEventTypes } from "../shared/protocol.js";
+import { ContentEventTypes, MessageTypes } from "../shared/protocol.js";
 import { tabOrigin } from "../shared/url.js";
 
 function normalizePageUrl(raw) {
@@ -33,6 +33,19 @@ async function sendToTabBestEffort(tabId, message) {
       const err = chrome.runtime.lastError;
       if (err) resolve({ ok: false, error: err.message });
       else resolve({ ok: true });
+    });
+  });
+}
+
+// Same as sendToTabBestEffort, but returns the response payload (or null on error).
+async function sendToTabRequest(tabId, message) {
+  return new Promise((resolve) => {
+    if (typeof tabId !== "number") return resolve(null);
+
+    chrome.tabs.sendMessage(tabId, message, (response) => {
+      const err = chrome.runtime.lastError;
+      if (err) return resolve(null);
+      resolve(response ?? null);
     });
   });
 }
@@ -88,6 +101,57 @@ function createBroadcast() {
   };
 }
 
+const CM = Object.freeze({
+  ROOT: "notext_root",
+  PIN: "notext_pin",
+  UNPIN: "notext_unpin",
+  REMOVE: "notext_remove",
+});
+
+function setupContextMenus() {
+  // Контекст-меню зберігається між рестартами SW, тому створюємо на install/update.
+  // У dev це також зручно: перезавантажив extension — меню оновилось.
+  try {
+    chrome.contextMenus.removeAll(() => {
+      const err = chrome.runtime.lastError;
+      if (err) console.warn("[contextMenus] removeAll:", err.message);
+
+      const rootContexts = ["page", "selection"];
+      chrome.contextMenus.create({
+        id: CM.ROOT,
+        title: "NotExtension",
+        contexts: rootContexts,
+      });
+
+      // Тримаємо пункти видимими і без активного selection (ПКМ всередині <mark>).
+      const itemContexts = ["page", "selection"];
+
+      chrome.contextMenus.create({
+        id: CM.PIN,
+        parentId: CM.ROOT,
+        title: "Pin",
+        contexts: itemContexts,
+      });
+
+      chrome.contextMenus.create({
+        id: CM.UNPIN,
+        parentId: CM.ROOT,
+        title: "Unpin",
+        contexts: itemContexts,
+      });
+
+      chrome.contextMenus.create({
+        id: CM.REMOVE,
+        parentId: CM.ROOT,
+        title: "Remove highlight",
+        contexts: itemContexts,
+      });
+    });
+  } catch (e) {
+    console.warn("[contextMenus] setup failed:", e);
+  }
+}
+
 export function initBackgroundKernel() {
   const broadcast = createBroadcast();
 
@@ -103,6 +167,70 @@ export function initBackgroundKernel() {
 
   chrome.runtime.onInstalled.addListener(() => {
     console.log("Extension installed/updated");
+    setupContextMenus();
+  });
+
+  // Контекст-меню: Pin / Unpin / Remove
+  chrome.contextMenus.onClicked.addListener((info, tab) => {
+    void (async () => {
+      const tabId = tab?.id;
+      if (typeof tabId !== "number") return;
+
+      // Просимо content: що саме таргетимо (existing highlight чи новий selection)
+      const cap = await sendToTabRequest(tabId, {
+        type: MessageTypes.HIGHLIGHT_CAPTURE_SELECTION,
+        payload: {},
+      });
+
+      if (!cap?.ok) return;
+
+      const pageUrl = normalizePageUrl(cap?.pageUrl || tab?.url || "");
+      const kind = cap?.kind;
+
+      const ids = Array.isArray(cap?.highlightIds) ? cap.highlightIds.filter(Boolean) : [];
+      const anchor = cap?.anchor ?? null;
+
+      if (!pageUrl) return;
+
+      if (info.menuItemId === CM.PIN) {
+        // Нове виділення → створюємо pinned highlight
+        if (kind === "new" && anchor) {
+          await route({
+            type: MessageTypes.HIGHLIGHT_CREATE,
+            payload: { pageUrl, color: "yellow", anchor, pinned: true, noteText: "" },
+          });
+          return;
+        }
+
+        // Існуючий highlight(и) → pinned=true
+        for (const id of ids) {
+          await route({
+            type: MessageTypes.HIGHLIGHT_PATCH,
+            payload: { pageUrl, id, patch: { pinned: true } },
+          });
+        }
+        return;
+      }
+
+      if (info.menuItemId === CM.UNPIN) {
+        for (const id of ids) {
+          await route({
+            type: MessageTypes.HIGHLIGHT_PATCH,
+            payload: { pageUrl, id, patch: { pinned: false } },
+          });
+        }
+        return;
+      }
+
+      if (info.menuItemId === CM.REMOVE) {
+        for (const id of ids) {
+          await route({
+            type: MessageTypes.HIGHLIGHT_DELETE,
+            payload: { pageUrl, id },
+          });
+        }
+      }
+    })().catch((e) => console.warn("[contextMenus] click failed:", e));
   });
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

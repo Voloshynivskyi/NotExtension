@@ -609,6 +609,16 @@
       });
     });
   }
+  async function sendToTabRequest(tabId, message) {
+    return new Promise((resolve) => {
+      if (typeof tabId !== "number") return resolve(null);
+      chrome.tabs.sendMessage(tabId, message, (response) => {
+        const err = chrome.runtime.lastError;
+        if (err) return resolve(null);
+        resolve(response ?? null);
+      });
+    });
+  }
   function createBroadcast() {
     return {
       async badgeSetByOrigin(origin, hasNote, fallbackTabId) {
@@ -651,6 +661,47 @@
       }
     };
   }
+  var CM = Object.freeze({
+    ROOT: "notext_root",
+    PIN: "notext_pin",
+    UNPIN: "notext_unpin",
+    REMOVE: "notext_remove"
+  });
+  function setupContextMenus() {
+    try {
+      chrome.contextMenus.removeAll(() => {
+        const err = chrome.runtime.lastError;
+        if (err) console.warn("[contextMenus] removeAll:", err.message);
+        const rootContexts = ["page", "selection"];
+        chrome.contextMenus.create({
+          id: CM.ROOT,
+          title: "NotExtension",
+          contexts: rootContexts
+        });
+        const itemContexts = ["page", "selection"];
+        chrome.contextMenus.create({
+          id: CM.PIN,
+          parentId: CM.ROOT,
+          title: "Pin",
+          contexts: itemContexts
+        });
+        chrome.contextMenus.create({
+          id: CM.UNPIN,
+          parentId: CM.ROOT,
+          title: "Unpin",
+          contexts: itemContexts
+        });
+        chrome.contextMenus.create({
+          id: CM.REMOVE,
+          parentId: CM.ROOT,
+          title: "Remove highlight",
+          contexts: itemContexts
+        });
+      });
+    } catch (e) {
+      console.warn("[contextMenus] setup failed:", e);
+    }
+  }
   function initBackgroundKernel() {
     const broadcast = createBroadcast();
     const handlers = {};
@@ -662,6 +713,56 @@
     console.log("Background Service Worker started \u{1F680}");
     chrome.runtime.onInstalled.addListener(() => {
       console.log("Extension installed/updated");
+      setupContextMenus();
+    });
+    chrome.contextMenus.onClicked.addListener((info, tab) => {
+      void (async () => {
+        const tabId = tab?.id;
+        if (typeof tabId !== "number") return;
+        const cap = await sendToTabRequest(tabId, {
+          type: MessageTypes.HIGHLIGHT_CAPTURE_SELECTION,
+          payload: {}
+        });
+        if (!cap?.ok) return;
+        const pageUrl = normalizePageUrl2(cap?.pageUrl || tab?.url || "");
+        const kind = cap?.kind;
+        const ids = Array.isArray(cap?.highlightIds) ? cap.highlightIds.filter(Boolean) : [];
+        const anchor = cap?.anchor ?? null;
+        if (!pageUrl) return;
+        if (info.menuItemId === CM.PIN) {
+          if (kind === "new" && anchor) {
+            await route({
+              type: MessageTypes.HIGHLIGHT_CREATE,
+              payload: { pageUrl, color: "yellow", anchor, pinned: true, noteText: "" }
+            });
+            return;
+          }
+          for (const id of ids) {
+            await route({
+              type: MessageTypes.HIGHLIGHT_PATCH,
+              payload: { pageUrl, id, patch: { pinned: true } }
+            });
+          }
+          return;
+        }
+        if (info.menuItemId === CM.UNPIN) {
+          for (const id of ids) {
+            await route({
+              type: MessageTypes.HIGHLIGHT_PATCH,
+              payload: { pageUrl, id, patch: { pinned: false } }
+            });
+          }
+          return;
+        }
+        if (info.menuItemId === CM.REMOVE) {
+          for (const id of ids) {
+            await route({
+              type: MessageTypes.HIGHLIGHT_DELETE,
+              payload: { pageUrl, id }
+            });
+          }
+        }
+      })().catch((e) => console.warn("[contextMenus] click failed:", e));
     });
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       (async () => {

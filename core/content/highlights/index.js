@@ -31,6 +31,10 @@ let raf = null;
 
 let enableBurstToken = 0;
 
+// Context-menu fallback: remember the last right-clicked highlight (works even when selection is collapsed).
+let lastContextMenuHighlightIds = [];
+let lastContextMenuTs = 0;
+
 function showToolbarStatus(msg, ms = 1300) {
   if (!toolbar) return;
   toolbar.setStatus(msg);
@@ -101,10 +105,42 @@ function scheduleEnableSyncBurst() {
   }
 }
 
+function compareRanges(a, b) {
+  try {
+    if (a.range.compareBoundaryPoints(Range.START_TO_START, b.range) < 0) return -1;
+    if (a.range.compareBoundaryPoints(Range.START_TO_START, b.range) > 0) return 1;
+  } catch {
+    // ignore
+  }
+  return 0;
+}
+
+function hasHighlightAlready(id) {
+  const sel = `mark.${HIGHLIGHT_CLASS}[data-hid="${CSS.escape(id)}"]`;
+  return Boolean(document.querySelector(sel));
+}
+
 function attachListeners() {
   if (!toolbar) return;
   aborter = new AbortController();
   const signal = aborter.signal;
+
+  document.addEventListener(
+    "contextmenu",
+    (e) => {
+      // Save highlight id under the cursor to support actions without an active selection.
+      const mark = getClosestHighlightMark(e.target);
+      const id = mark?.getAttribute?.("data-hid") || "";
+      if (id) {
+        lastContextMenuHighlightIds = [id];
+        lastContextMenuTs = Date.now();
+      } else {
+        lastContextMenuHighlightIds = [];
+        lastContextMenuTs = Date.now();
+      }
+    },
+    { capture: true, signal }
+  );
 
   document.addEventListener(
     "selectionchange",
@@ -196,7 +232,6 @@ function initHighlightsOnce() {
         showToolbarStatus(res.message || "Cannot highlight");
         return;
       }
-      toolbar.clearStatus();
       toolbar.hide();
     },
     onPin: async () => {
@@ -205,51 +240,62 @@ function initHighlightsOnce() {
         showToolbarStatus(res.message || "Cannot pin");
         return;
       }
-      toolbar.clearStatus();
       toolbar.hide();
     },
     onRemove: async () => {
       const res = await removeSelectionHighlights();
       if (res?.keepOpen) {
-        showToolbarStatus(res.message || "Nothing to remove");
+        showToolbarStatus(res.message || "Cannot remove");
         return;
       }
-      toolbar.clearStatus();
+      toolbar.hide();
+    },
+    onOpenPins: () => {
+      openPinsPanel({});
       toolbar.hide();
     },
   });
 
-  toolbar.hide();
-  setToolbarPinVisible(pinsEnabled);
-
-  scheduleRestoreWithRetries();
+  // Pins panel init (lazy UI)
+  initPinsPanel({
+    onRequestUnpin: async (id) => {
+      const pageUrl = getPageUrl();
+      await patchHighlight({ pageUrl, id, patch: { pinned: false } }).catch(() => { });
+      await syncHighlightsFromStore().catch(() => { });
+    },
+    onRequestDelete: async (id) => {
+      const pageUrl = getPageUrl();
+      await deleteHighlight({ pageUrl, id }).catch(() => { });
+      await syncHighlightsFromStore().catch(() => { });
+    },
+    onRequestPatch: async (id, patch) => {
+      const pageUrl = getPageUrl();
+      await patchHighlight({ pageUrl, id, patch }).catch(() => { });
+      await syncHighlightsFromStore().catch(() => { });
+    },
+  });
 }
 
-// ---- PUBLIC API (live gating) ----
 export async function setPinsEnabled(enabled) {
-  pinsEnabled = Boolean(enabled);
+  const next = Boolean(enabled);
+  if (pinsEnabled === next) return { ok: true, enabled: pinsEnabled };
 
-  if (pinsEnabled) {
-    try {
-      initPinsPanel();
-    } catch {
-      // ignore
-    }
-  }
+  pinsEnabled = next;
+
+  // Pins cannot exist without highlights (UI correctness)
+  if (!hlEnabled && pinsEnabled) pinsEnabled = false;
 
   setToolbarPinVisible(pinsEnabled);
 
   if (!pinsEnabled) {
-    removeAllPinMarkersFromDom();
     closePinsPanel();
-    return { ok: true, enabled: false };
-  }
-
-  if (hlEnabled) {
+    removeAllPinMarkersFromDom();
+  } else if (hlEnabled) {
+    // pins on -> rerender pins
     await syncHighlightsFromStore().catch(() => { });
   }
 
-  return { ok: true, enabled: true };
+  return { ok: true, enabled: pinsEnabled };
 }
 
 export async function setHighlightsEnabled(enabled) {
@@ -282,6 +328,53 @@ export async function setHighlightsEnabled(enabled) {
 // Backward-compatible init (older code paths)
 export function initHighlights() {
   void setHighlightsEnabled(true);
+}
+
+// Used by background context-menu actions.
+// Returns either:
+// - { ok:true, kind:"existing", pageUrl, highlightIds:[...] }
+// - { ok:true, kind:"new", pageUrl, anchor }
+// - { ok:false, kind:"none", pageUrl, error }
+export function captureSelectionForContextMenu() {
+  const pageUrl = getPageUrl();
+
+  // 1) Prefer current selection if it exists.
+  const sel = window.getSelection?.();
+  if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+    const text = sel.toString?.() || "";
+    const range = sel.getRangeAt(0);
+
+    // If selection intersects existing highlight(s), treat it as "existing".
+    const ids = getHighlightIdsInRange(range);
+    if (ids.length > 0) {
+      return { ok: true, kind: "existing", pageUrl, highlightIds: ids };
+    }
+
+    // Otherwise, create a new anchor.
+    if (text.trim().length > 0) {
+      const anchor = makeAnchor(range);
+      const exact = anchor?.quote?.exact || "";
+      if (exact.trim().length > 0) {
+        return { ok: true, kind: "new", pageUrl, anchor };
+      }
+    }
+  }
+
+  // 2) Fallback: last right-clicked highlight (works when selection is collapsed).
+  if (
+    Array.isArray(lastContextMenuHighlightIds) &&
+    lastContextMenuHighlightIds.length > 0 &&
+    Date.now() - lastContextMenuTs < 3000
+  ) {
+    return {
+      ok: true,
+      kind: "existing",
+      pageUrl,
+      highlightIds: lastContextMenuHighlightIds.slice(),
+    };
+  }
+
+  return { ok: false, kind: "none", pageUrl, error: "No selection/highlight" };
 }
 
 // ---- ACTIONS ----
@@ -443,53 +536,30 @@ async function removeSelectionHighlights() {
   if (!lastRange) return { keepOpen: true, message: "No selection" };
 
   const r = lastRange.cloneRange();
-  const pageUrl = getPageUrl();
-
   const ids = getHighlightIdsInRange(r);
-  if (ids.length === 0) {
-    return { keepOpen: true, message: "No highlight found in selection" };
-  }
 
-  for (const id of ids) {
-    const res = await deleteHighlight({ pageUrl, id });
-    if (!res?.ok) {
-      console.warn("[highlights] delete failed:", id, res?.error);
-      continue;
-    }
-    unwrapHighlightMarks(id);
-    removePinMarker(id);
+  if (ids.length === 0) return { keepOpen: true, message: "No highlight selected" };
+
+  if (ids.length > 1) return { keepOpen: true, message: "Multiple highlights selected" };
+
+  const pageUrl = getPageUrl();
+  const id = ids[0];
+
+  const del = await deleteHighlight({ pageUrl, id });
+  if (!del?.ok) {
+    console.warn("[highlights] delete failed:", del?.error);
+    return { keepOpen: true, message: "Remove failed" };
   }
 
   await syncHighlightsFromStore();
+
   lastRange = null;
   clearSelection();
   return { keepOpen: false };
 }
 
-// ---- RESTORE / SYNC ----
-function hasHighlightAlready(id) {
-  if (!id) return false;
-  return Boolean(
-    document.querySelector(`mark.${HIGHLIGHT_CLASS}[data-hid="${CSS.escape(id)}"]`)
-  );
-}
-
-function compareRanges(a, b) {
-  const ar = a.range;
-  const br = b.range;
-
-  if (ar.startContainer === br.startContainer) {
-    return ar.startOffset - br.startOffset;
-  }
-
-  const pos = ar.startContainer.compareDocumentPosition(br.startContainer);
-  if (pos & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
-  if (pos & Node.DOCUMENT_POSITION_PRECEDING) return 1;
-  return 0;
-}
-
 export async function syncHighlightsFromStore() {
-  if (!hlEnabled) return { ok: true, skipped: true };
+  if (!hlEnabled) return { ok: true, total: 0, applied: 0, disabled: true };
 
   const pageUrl = getPageUrl();
   const res = await listHighlights({ pageUrl });

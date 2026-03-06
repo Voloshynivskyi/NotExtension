@@ -1710,6 +1710,8 @@
   var aborter = null;
   var raf = null;
   var enableBurstToken = 0;
+  var lastContextMenuHighlightIds = [];
+  var lastContextMenuTs = 0;
   function showToolbarStatus(msg, ms = 1300) {
     if (!toolbar) return;
     toolbar.setStatus(msg);
@@ -1772,10 +1774,37 @@
       }, ms);
     }
   }
+  function compareRanges(a, b) {
+    try {
+      if (a.range.compareBoundaryPoints(Range.START_TO_START, b.range) < 0) return -1;
+      if (a.range.compareBoundaryPoints(Range.START_TO_START, b.range) > 0) return 1;
+    } catch {
+    }
+    return 0;
+  }
+  function hasHighlightAlready(id) {
+    const sel = `mark.${HIGHLIGHT_CLASS}[data-hid="${CSS.escape(id)}"]`;
+    return Boolean(document.querySelector(sel));
+  }
   function attachListeners() {
     if (!toolbar) return;
     aborter = new AbortController();
     const signal = aborter.signal;
+    document.addEventListener(
+      "contextmenu",
+      (e) => {
+        const mark = getClosestHighlightMark(e.target);
+        const id = mark?.getAttribute?.("data-hid") || "";
+        if (id) {
+          lastContextMenuHighlightIds = [id];
+          lastContextMenuTs = Date.now();
+        } else {
+          lastContextMenuHighlightIds = [];
+          lastContextMenuTs = Date.now();
+        }
+      },
+      { capture: true, signal }
+    );
     document.addEventListener(
       "selectionchange",
       () => {
@@ -1854,7 +1883,6 @@
           showToolbarStatus(res.message || "Cannot highlight");
           return;
         }
-        toolbar.clearStatus();
         toolbar.hide();
       },
       onPin: async () => {
@@ -1863,42 +1891,59 @@
           showToolbarStatus(res.message || "Cannot pin");
           return;
         }
-        toolbar.clearStatus();
         toolbar.hide();
       },
       onRemove: async () => {
         const res = await removeSelectionHighlights();
         if (res?.keepOpen) {
-          showToolbarStatus(res.message || "Nothing to remove");
+          showToolbarStatus(res.message || "Cannot remove");
           return;
         }
-        toolbar.clearStatus();
+        toolbar.hide();
+      },
+      onOpenPins: () => {
+        openPinsPanel({});
         toolbar.hide();
       }
     });
-    toolbar.hide();
-    setToolbarPinVisible(pinsEnabled);
-    scheduleRestoreWithRetries();
+    initPinsPanel({
+      onRequestUnpin: async (id) => {
+        const pageUrl = getPageUrl();
+        await patchHighlight({ pageUrl, id, patch: { pinned: false } }).catch(() => {
+        });
+        await syncHighlightsFromStore().catch(() => {
+        });
+      },
+      onRequestDelete: async (id) => {
+        const pageUrl = getPageUrl();
+        await deleteHighlight({ pageUrl, id }).catch(() => {
+        });
+        await syncHighlightsFromStore().catch(() => {
+        });
+      },
+      onRequestPatch: async (id, patch) => {
+        const pageUrl = getPageUrl();
+        await patchHighlight({ pageUrl, id, patch }).catch(() => {
+        });
+        await syncHighlightsFromStore().catch(() => {
+        });
+      }
+    });
   }
   async function setPinsEnabled(enabled) {
-    pinsEnabled = Boolean(enabled);
-    if (pinsEnabled) {
-      try {
-        initPinsPanel();
-      } catch {
-      }
-    }
+    const next = Boolean(enabled);
+    if (pinsEnabled === next) return { ok: true, enabled: pinsEnabled };
+    pinsEnabled = next;
+    if (!hlEnabled && pinsEnabled) pinsEnabled = false;
     setToolbarPinVisible(pinsEnabled);
     if (!pinsEnabled) {
-      removeAllPinMarkersFromDom();
       closePinsPanel();
-      return { ok: true, enabled: false };
-    }
-    if (hlEnabled) {
+      removeAllPinMarkersFromDom();
+    } else if (hlEnabled) {
       await syncHighlightsFromStore().catch(() => {
       });
     }
-    return { ok: true, enabled: true };
+    return { ok: true, enabled: pinsEnabled };
   }
   async function setHighlightsEnabled(enabled) {
     const next = Boolean(enabled);
@@ -1922,6 +1967,34 @@
     attachListeners();
     scheduleEnableSyncBurst();
     return { ok: true, enabled: true };
+  }
+  function captureSelectionForContextMenu() {
+    const pageUrl = getPageUrl();
+    const sel = window.getSelection?.();
+    if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+      const text = sel.toString?.() || "";
+      const range = sel.getRangeAt(0);
+      const ids = getHighlightIdsInRange(range);
+      if (ids.length > 0) {
+        return { ok: true, kind: "existing", pageUrl, highlightIds: ids };
+      }
+      if (text.trim().length > 0) {
+        const anchor = makeAnchor(range);
+        const exact = anchor?.quote?.exact || "";
+        if (exact.trim().length > 0) {
+          return { ok: true, kind: "new", pageUrl, anchor };
+        }
+      }
+    }
+    if (Array.isArray(lastContextMenuHighlightIds) && lastContextMenuHighlightIds.length > 0 && Date.now() - lastContextMenuTs < 3e3) {
+      return {
+        ok: true,
+        kind: "existing",
+        pageUrl,
+        highlightIds: lastContextMenuHighlightIds.slice()
+      };
+    }
+    return { ok: false, kind: "none", pageUrl, error: "No selection/highlight" };
   }
   async function createAndApplyHighlight({ pinned }) {
     if (!hlEnabled) return { keepOpen: true, message: "Highlights are disabled" };
@@ -2040,44 +2113,23 @@
     if (!hlEnabled) return { keepOpen: true, message: "Highlights are disabled" };
     if (!lastRange) return { keepOpen: true, message: "No selection" };
     const r = lastRange.cloneRange();
-    const pageUrl = getPageUrl();
     const ids = getHighlightIdsInRange(r);
-    if (ids.length === 0) {
-      return { keepOpen: true, message: "No highlight found in selection" };
-    }
-    for (const id of ids) {
-      const res = await deleteHighlight({ pageUrl, id });
-      if (!res?.ok) {
-        console.warn("[highlights] delete failed:", id, res?.error);
-        continue;
-      }
-      unwrapHighlightMarks3(id);
-      removePinMarker(id);
+    if (ids.length === 0) return { keepOpen: true, message: "No highlight selected" };
+    if (ids.length > 1) return { keepOpen: true, message: "Multiple highlights selected" };
+    const pageUrl = getPageUrl();
+    const id = ids[0];
+    const del = await deleteHighlight({ pageUrl, id });
+    if (!del?.ok) {
+      console.warn("[highlights] delete failed:", del?.error);
+      return { keepOpen: true, message: "Remove failed" };
     }
     await syncHighlightsFromStore();
     lastRange = null;
     clearSelection();
     return { keepOpen: false };
   }
-  function hasHighlightAlready(id) {
-    if (!id) return false;
-    return Boolean(
-      document.querySelector(`mark.${HIGHLIGHT_CLASS}[data-hid="${CSS.escape(id)}"]`)
-    );
-  }
-  function compareRanges(a, b) {
-    const ar = a.range;
-    const br = b.range;
-    if (ar.startContainer === br.startContainer) {
-      return ar.startOffset - br.startOffset;
-    }
-    const pos = ar.startContainer.compareDocumentPosition(br.startContainer);
-    if (pos & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
-    if (pos & Node.DOCUMENT_POSITION_PRECEDING) return 1;
-    return 0;
-  }
   async function syncHighlightsFromStore() {
-    if (!hlEnabled) return { ok: true, skipped: true };
+    if (!hlEnabled) return { ok: true, total: 0, applied: 0, disabled: true };
     const pageUrl = getPageUrl();
     const res = await listHighlights({ pageUrl });
     if (!res?.ok) return { ok: false, error: res?.error || "list failed" };
@@ -2113,26 +2165,6 @@
       else removePinMarker(id);
     }
     return { ok: true, total: list.length, applied: planned.length };
-  }
-  function scheduleRestoreWithRetries() {
-    const delays = [0, 250, 1e3, 2500, 5e3];
-    delays.forEach((ms) => {
-      setTimeout(async () => {
-        try {
-          await syncHighlightsFromStore();
-        } catch (e) {
-          console.warn("[hl] restore failed:", e);
-        }
-      }, ms);
-    });
-    window.addEventListener(
-      "load",
-      () => {
-        setTimeout(() => syncHighlightsFromStore().catch(() => {
-        }), 0);
-      },
-      { once: true }
-    );
   }
   function getValidSelectionRange(toolbarApi) {
     const sel = window.getSelection?.();
@@ -2187,10 +2219,6 @@
     if (bRes?.ok && typeof bRes.hasNote === "boolean") return bRes.hasNote;
     return false;
   }
-  function computeHasNoteFromStorageValue(v) {
-    const text = typeof v === "string" ? v : "";
-    return text.trim().length > 0;
-  }
   function applyThemeToRoot(theme) {
     const t = theme === "dark" ? "dark" : "light";
     document.documentElement.dataset.theme = t;
@@ -2217,62 +2245,24 @@
       setBadgeVisible(false);
       const hasNote = await fetchHasNote(origin);
       setBadgeVisible(hasNote);
-    } else {
-      setBadgeVisible(false);
     }
-    if (chrome?.storage?.onChanged) {
-      chrome.storage.onChanged.addListener((changes, areaName) => {
-        if (areaName !== "local") return;
-        if (changes[SETTINGS_KEY]) {
-          const prevHighlights = Boolean(settings.modules?.highlights);
-          const prevPins = Boolean(settings.modules?.pins);
-          const nextRaw = changes[SETTINGS_KEY].newValue;
-          const next = normalizeSettings(nextRaw || DEFAULT_SETTINGS);
-          settings = next;
-          applyThemeToRoot(settings.theme);
-          const enabledNow = isBadgeEnabledForOrigin(settings, origin);
-          setBadgeEnabledForThisSite(enabledNow);
-          if (settings.modules?.badge && enabledNow) {
-            ensureBadge();
-            if (changes[origin]) {
-              setBadgeVisible(
-                computeHasNoteFromStorageValue(changes[origin].newValue)
-              );
-            } else {
-              void (async () => {
-                const hasNote = await fetchHasNote(origin);
-                setBadgeVisible(hasNote);
-              })();
-            }
-          } else {
-            setBadgeVisible(false);
-          }
-          const nextHighlights = Boolean(settings.modules?.highlights);
-          const nextPins = Boolean(settings.modules?.pins);
-          void (async () => {
-            try {
-              if (prevPins !== nextPins) {
-                await setPinsEnabled(nextPins);
-              }
-              if (prevHighlights !== nextHighlights) {
-                await setHighlightsEnabled(nextHighlights);
-              }
-            } catch (e) {
-              console.warn("Live gating failed:", e);
-            }
-          })();
-        }
-        if (changes[origin]) {
-          const enabledNow = isBadgeEnabledForOrigin(settings, origin);
-          if (!settings.modules?.badge || !enabledNow) return;
-          ensureBadge();
-          setBadgeVisible(computeHasNoteFromStorageValue(changes[origin].newValue));
-        }
-      });
-    }
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName !== "local") return;
+      if (!changes[SETTINGS_KEY]) return;
+      const nextSettings = normalizeSettings(changes[SETTINGS_KEY].newValue);
+      settings = nextSettings;
+      applyThemeToRoot(settings.theme);
+      const enabledNow = isBadgeEnabledForOrigin(settings, origin);
+      setBadgeEnabledForThisSite(enabledNow);
+      void setPinsEnabled(Boolean(settings.modules?.pins)).catch(
+        (e) => console.warn("setPinsEnabled failed:", e)
+      );
+      void setHighlightsEnabled(Boolean(settings.modules?.highlights)).catch(
+        (e) => console.warn("setHighlightsEnabled failed:", e)
+      );
+    });
     async function handleMessage(message) {
-      if (!message || typeof message !== "object") return;
-      const { type, payload } = message;
+      const { type, payload } = message ?? {};
       switch (type) {
         case ContentEventTypes.BADGE_SET: {
           if (!settings.modules?.badge) return;
@@ -2312,10 +2302,27 @@
         }
       }
     }
-    chrome.runtime.onMessage.addListener((message) => {
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      if (message?.type === MessageTypes.HIGHLIGHT_CAPTURE_SELECTION) {
+        void (async () => {
+          if (!settings.modules?.highlights) {
+            sendResponse({ ok: false, error: "highlights disabled" });
+            return;
+          }
+          try {
+            const res = captureSelectionForContextMenu();
+            sendResponse(res);
+          } catch (e) {
+            console.warn("captureSelectionForContextMenu failed:", e);
+            sendResponse({ ok: false, error: "capture failed" });
+          }
+        })();
+        return true;
+      }
       void handleMessage(message).catch(
         (e) => console.warn("Content handleMessage failed:", e)
       );
+      return false;
     });
   }
 
